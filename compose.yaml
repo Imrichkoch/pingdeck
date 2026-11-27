@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 25s
+    ports:
+      - "127.0.0.1:${PINGDECK_BIND_PORT:-3417}:3417"
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-http://localhost:3417}
+      BASE_PATH: ${BASE_PATH:-}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      HISTORY_DAYS: ${HISTORY_DAYS:-30}
+      MAX_DEVICES: ${MAX_DEVICES:-25}
+      SENDS_PER_MINUTE: ${SENDS_PER_MINUTE:-30}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
+      SOURCE_ARCHIVE: /downloads/pingdeck-source.zip
+      ANDROID_APK: /downloads/pingdeck.apk
+      MAIL_IMAP_HOST: ${MAIL_IMAP_HOST:-}
+      MAIL_IMAP_ADDRESS: ${MAIL_IMAP_ADDRESS:-}
+      MAIL_IMAP_PASSWORD: ${MAIL_IMAP_PASSWORD:-}
+      MAIL_IMAP_PORT: ${MAIL_IMAP_PORT:-993}
+      MAIL_POLL_SECONDS: ${MAIL_POLL_SECONDS:-15}
+    volumes:
+      - data:/data
+      - ./downloads:/downloads:ro
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3417'+(process.env.BASE_PATH||'')+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  data:

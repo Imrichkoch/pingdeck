@@ -1,0 +1,9 @@
+*
+!package.json
+!package-lock.json
+!*.mjs
+!branding.json
+!public/
+!public/**
+!views/
+!views/**

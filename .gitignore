@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+data/
+downloads/
+node_modules/
+work/
+pingdeck-source.zip
+pingdeck.apk
+*.p12
+*.dpapi

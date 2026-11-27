@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2ea">
+  <meta name="robots" content="noindex">
+  <title>{{name}} — Doručené správy</title>
+  <link rel="icon" href="{{base}}/icon-192.png">
+  <link rel="apple-touch-icon" href="{{base}}/icon-192.png">
+  <link rel="manifest" href="{{base}}/iphone.webmanifest">
+  <link rel="stylesheet" href="{{base}}/site.css">
+  <script defer src="{{base}}/inbox-db.js"></script>
+  <script defer src="{{base}}/inbox.js"></script>
+</head>
+<body data-base="{{base}}">
+  <header class="site-header"><div class="shell header-inner">
+    <a href="{{base}}/iphone-app" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
+    <a class="button button-small button-outline header-cta" href="{{base}}/app#zariadenia">Pripojiť zariadenie ↗</a>
+  </div></header>
+  <main class="shell install-shell receiver-shell">
+    <p class="eyebrow"><span class="indicator"></span> SCHRÁNKA V TOMTO ZARIADENÍ</p>
+    <h1>Doručené správy</h1>
+    <p id="inbox-status" role="status">Načítavam správy…</p>
+    <div class="actions">
+      <a class="button button-primary" href="{{base}}/app#zariadenia" id="inbox-setup">Povoliť upozornenia ↗</a>
+      <a class="button button-outline" href="{{base}}/iphone" id="inbox-help">Inštalácia na iPhone ↗</a>
+    </div>
+    <section id="inbox-list" aria-label="Doručené upozornenia"></section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2ea">
+  <meta name="robots" content="noindex">
+  <title>{{name}} — Ovládací panel</title>
+  <link rel="icon" href="{{base}}/icon-192.png">
+  <link rel="apple-touch-icon" href="{{base}}/icon-192.png">
+  <link rel="manifest" href="{{base}}/manifest.webmanifest">
+  <link rel="stylesheet" href="{{base}}/site.css">
+  <script type="module" src="{{base}}/app.js"></script>
+</head>
+<body data-base="{{base}}" data-name="{{name}}" data-default-title="{{defaultTitle}}" data-endpoint="{{endpoint}}">
+  <header class="site-header">
+    <div class="shell header-inner">
+      <a href="{{base}}/" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
+      <button class="button button-small button-outline header-cta" id="logout" type="button" hidden>Odhlásiť sa</button>
+    </div>
+  </header>
+  <main class="shell app-shell">
+    <section id="entrance" class="entrance">
+      <div class="auth-card">
+        <p class="eyebrow"><span class="indicator"></span> OVLÁDACÍ PANEL</p>
+        <h1 id="auth-title">Pripájam sa…</h1>
+        <p id="auth-note" class="muted"></p>
+        <form id="auth-form" hidden>
+          <label id="setup-label" hidden>Jednorazový kód<input id="setup-code" name="code" autocomplete="off" spellcheck="false"></label>
+          <label>Heslo<input id="password" name="password" type="password" maxlength="128" required></label>
+          <button class="button button-primary" id="auth-submit" type="submit">Prihlásiť sa ↗</button>
+          <p class="feedback" id="auth-feedback" role="status"></p>
+        </form>
+      </div>
+    </section>
+
+    <div id="workspace" hidden>
+      <nav class="app-nav" aria-label="Panel">
+        <a href="#prehlad" data-view="prehlad">Prehľad</a>
+        <a href="#zariadenia" data-view="zariadenia">Zariadenia</a>
+        <a href="#historia" data-view="historia">História</a>
+        <a href="#integracie" data-view="integracie">Integrácie</a>
+      </nav>
+      <p class="feedback" id="workspace-feedback" role="status"></p>
+
+      <section class="panel-view" id="prehlad" hidden>
+        <div class="app-heading"><div><p class="eyebrow"><span class="indicator"></span> PREHĽAD</p><h1>Centrum upozornení</h1></div><a href="#zariadenia" class="button button-outline">Pripojiť zariadenie +</a></div>
+        <div class="dashboard-grid">
+          <article class="app-card">
+            <h2>Nové upozornenie</h2>
+            <form id="send-form">
+              <label>Nadpis <input name="title" maxlength="100" placeholder="{{defaultTitle}}"></label>
+              <label>Správa <textarea name="message" maxlength="600" rows="4" placeholder="Čo sa stalo?" required></textarea></label>
+              <label>Príjemca <select name="target" id="targets"><option value="all">Všetky zariadenia</option></select></label>
+              <details>
+                <summary>Odkaz, priorita a platnosť</summary>
+                <div class="details-fields">
+                  <label>Odkaz <input name="url" type="url" maxlength="1500" placeholder="https://…"></label>
+                  <div class="form-split">
+                    <label>Priorita <select name="urgency"><option value="normal">Bežná</option><option value="high">Vysoká</option><option value="low">Nízka</option><option value="very-low">Veľmi nízka</option></select></label>
+                    <label>Platnosť v sekundách <input type="number" name="ttl" min="0" max="604800" value="3600" required></label>
+                  </div>
+                </div>
+              </details>
+              <button class="button button-primary" type="submit">Odoslať upozornenie ↗</button>
+              <p class="feedback" id="send-feedback" role="status"></p>
+            </form>
+          </article>
+          <aside class="preview-card">
+            <p class="eyebrow"><span class="indicator"></span> NÁHĽAD SPRÁVY</p>
+            <div class="notification"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span><div><span class="notification-brand">{{name}}</span><strong id="preview-title">{{defaultTitle}}</strong><p id="preview-message">Tu sa zobrazí text správy.</p></div></div>
+            <div class="preview-meta"><div><span id="device-count">0</span> pripojené zariadenia</div><a href="#historia">História odoslaní ↗</a></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel-view" id="zariadenia" hidden>
+        <div class="app-heading"><div><p class="eyebrow"><span class="indicator"></span> PRÍJEMCOVIA</p><h1>Zariadenia</h1></div></div>
+        <div class="dashboard-grid">
+          <article class="app-card">
+            <h2>Pripojiť toto zariadenie</h2>
+            <p class="muted">Na iPhone alebo iPade pridaj panel v Safari na plochu a otvor ho odtiaľ.</p>
+            <form id="device-form">
+              <label>Názov <input name="name" maxlength="48" placeholder="Napr. pracovný notebook" required></label>
+              <label>Skupina <input name="group" maxlength="48" placeholder="Napr. monitoring" list="group-options"></label>
+              <datalist id="group-options"></datalist>
+              <button class="button button-primary" type="submit">Povoliť upozornenia ↗</button>
+              <p class="feedback" id="device-feedback" role="status"></p>
+            </form>
+            <div class="mobile-actions"><a href="{{base}}/iphone-app">Schránka v zariadení ↗</a></div>
+          </article>
+          <article class="app-card"><h2>Pripojené zariadenia</h2><div class="records" id="device-list"></div></article>
+          <article class="app-card">
+            <h2>Spárovať Android aplikáciu</h2>
+            <p class="muted">Vytvor jednorazový kód a vlož ho do PingDecku v telefóne do 10 minút.</p>
+            <form id="pair-form">
+              <label>Názov telefónu <input name="name" maxlength="48" placeholder="Napr. pracovný telefón" required></label>
+              <label>Skupina telefónu <input name="group" maxlength="48" list="group-options" placeholder="Napr. monitoring"></label>
+              <button class="button button-primary" type="submit">Vytvoriť Android kód +</button>
+              <p class="feedback" id="pair-feedback" role="status"></p>
+            </form>
+            <div id="pair-result" class="new-key" hidden>
+              <label>Párovací kód <input id="pair-code" readonly spellcheck="false"></label>
+              <button class="button button-small button-outline" id="copy-pair" type="button">Kopírovať kód</button>
+            </div>
+            <div class="actions mobile-actions">{{androidLink}}<a href="{{base}}/iphone">Pridať na iPhone ↗</a></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel-view" id="historia" hidden>
+        <div class="app-heading"><div><p class="eyebrow"><span class="indicator"></span> ODOSLANIA</p><h1>História</h1></div><button class="button button-outline" id="refresh" type="button">Obnoviť ↻</button></div>
+        <article class="app-card">
+          <h2>Posledné odoslania</h2>
+          <p class="muted">Prijaté správy prevzala služba Web Push alebo čakajú vo fronte pre Android. Zobrazenie na zariadení sa v tomto prehľade nesleduje.</p>
+          <div class="records" id="history-list"></div>
+        </article>
+      </section>
+
+      <section class="panel-view" id="integracie" hidden>
+        <div class="app-heading"><div><p class="eyebrow"><span class="indicator"></span> HTTP API</p><h1>Integrácie</h1></div></div>
+        <div class="dashboard-grid">
+          <article class="app-card">
+            <h2>API kľúče</h2>
+            <p class="muted">Každý kľúč povoľuje odosielanie správ. Po vytvorení sa jeho hodnota zobrazí raz.</p>
+            <form id="key-form">
+              <label>Názov integrácie <input name="label" maxlength="48" placeholder="Napr. n8n" required></label>
+              <button class="button button-primary" type="submit">Vytvoriť API kľúč +</button>
+              <p class="feedback" id="key-feedback" role="status"></p>
+            </form>
+            <div id="new-key" class="new-key" hidden><label>Ulož si nový API kľúč <input id="secret" readonly></label><div class="actions"><button class="button button-outline button-small" id="copy-key">Kopírovať</button><button class="button button-outline button-small" id="hide-key">Skryť</button></div></div>
+            <div class="records" id="key-list"></div>
+          </article>
+          <article class="app-card">
+            <h2>Prvé volanie</h2>
+            <p class="muted">Nastav premennú <code>PINGDECK_KEY</code> na svoj API kľúč.</p>
+            <div class="code-window"><div class="code-header"><span>BASH</span><button id="copy-api" type="button">Kopírovať</button></div><pre><code id="api-example">curl '{{endpoint}}' \
+  -H "Authorization: Bearer $PINGDECK_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Monitoring","message":"Všetko beží."}'</code></pre></div>
+            <p class="muted">Voliteľné parametre sú <code>deviceId</code> alebo <code>group</code>, <code>url</code>, <code>ttl</code> a <code>urgency</code>.</p>
+          </article>
+          <article class="app-card" id="mail-panel" hidden>
+            <h2>Upozornenia z e-mailu</h2>
+            <p class="muted">Pošli e-mail na túto súkromnú adresu. Predmet bude nadpis a telo bude text upozornenia. Adresu poskytni iba zdrojom, ktorým dôveruješ.</p>
+            <div class="new-key">
+              <label>Prijímacia adresa <input id="mail-address" readonly spellcheck="false"></label>
+              <button class="button button-small button-outline" id="copy-email" type="button">Kopírovať adresu</button>
+            </div>
+            <p class="muted">Pre odoslanie skupine pridaj na začiatok predmetu <code>[skupina:monitoring]</code>.</p>
+            <p class="feedback" id="mail-feedback" role="status"></p>
+          </article>
+        </div>
+      </section>
+    </div>
+    <dialog id="edit-device">
+      <h2>Upraviť zariadenie</h2>
+      <form id="edit-form">
+        <input type="hidden" name="id">
+        <label>Názov <input name="name" maxlength="48" required></label>
+        <label>Skupina <input name="group" maxlength="48" list="group-options"></label>
+        <div class="actions"><button type="submit" class="button button-primary">Uložiť</button><button type="button" id="cancel-edit" class="button button-outline">Zavrieť</button></div>
+        <p class="feedback" id="edit-feedback" role="status"></p>
+      </form>
+    </dialog>
+    <noscript>Na ovládanie panelu je potrebný JavaScript.</noscript>
+  </main>
+</body>
+</html>
