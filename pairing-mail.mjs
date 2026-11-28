@@ -28,6 +28,27 @@ const escape = value => value.replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char])
 
+export async function emailRegistration({ to, password, language }) {
+  const t = source => translate(language, source)
+  const link = config.origin + config.base + '/app?lang=' + language + '#aktivacia'
+  const heading = t('Aktivuj si účet v PingDecku')
+  const instructions = t('Pri aktivácii zadaj svoj e-mail a dočasné heslo. Potom si nastav vlastné heslo.')
+  const label = t('Dočasné heslo')
+  const expiry = t('Dočasné heslo platí 30 minút a dá sa použiť raz. Ak si o účet nepožiadal, e-mail môžeš ignorovať.')
+  const open = t('Aktivovať účet')
+  const result = await transport.sendMail({
+    from: { name: config.brand.name, address: mail.address },
+    to: [{ address: to }],
+    subject: heading,
+    headers: { 'Auto-Submitted': 'auto-generated' },
+    text: [heading, instructions, label + ' — ' + password, open + ' — ' + link, expiry].join('\n\n'),
+    html: '<h1>' + escape(heading) + '</h1><p>' + escape(instructions) + '</p><p>' +
+      escape(label) + ' <strong>' + escape(password) + '</strong></p><p><a href="' +
+      escape(link) + '">' + escape(open) + '</a></p><p>' + escape(expiry) + '</p>'
+  })
+  if (!result.accepted.length) throw new Error('Registration message was not accepted by SMTP.')
+}
+
 export async function emailPairing({ to, code, language }) {
   const t = source => translate(language, source)
   const link = pairingLink(code)

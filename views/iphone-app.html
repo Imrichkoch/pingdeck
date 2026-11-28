@@ -24,7 +24,8 @@
     <h1>{{t:Doručené správy}}</h1>
     <p id="inbox-status" role="status">{{t:Načítavam správy…}}</p>
     <div class="actions">
-      <a class="button button-primary" href="{{base}}/app#zariadenia" id="inbox-setup">{{t:Povoliť upozornenia ↗}}</a>
+      <a class="button button-primary" href="{{base}}/app#zariadenia" id="inbox-setup" hidden>{{t:Povoliť upozornenia ↗}}</a>
+      <a class="button button-primary" href="{{base}}/app" id="inbox-login" hidden>{{t:Prihlásiť sa}}</a>
       <a class="button button-outline" href="{{base}}/iphone" id="inbox-help">{{t:Inštalácia na iPhone ↗}}</a>
     </div>
     <section id="inbox-list" aria-label="{{t:Doručené upozornenia}}"></section>

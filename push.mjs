@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import webPush from 'web-push'
 import { config } from './config.mjs'
 import { enqueueMobile, nativeTargets } from './mobile-store.mjs'
-import { deleteDevice, finishHistory, startHistory, targets, vapidKeys } from './store.mjs'
+import { deleteDevice, finishHistory, startHistory, targets, vapidKeys, ownerId } from './store.mjs'
 
 export class InputError extends Error {
   constructor(message, status = 400) {
@@ -67,7 +67,7 @@ function clickUrl(value) {
 const vapidDetails = { subject: config.vapidSubject, ...vapidKeys() }
 export const vapidPublicKey = vapidDetails.publicKey
 
-export async function sendPush(body, { id = randomUUID() } = {}) {
+export async function sendPush(body, { id = randomUUID(), accountId = ownerId } = {}) {
   const title = text(body.title, 'nadpis', 100) || config.brand.defaultTitle
   const message = text(body.message, 'správa', 600, true)
   const url = clickUrl(body.url)
@@ -82,13 +82,15 @@ export async function sendPush(body, { id = randomUUID() } = {}) {
     throw new InputError('Neplatná priorita.')
   }
   if (deviceId && group) throw new InputError('Vyber jedno zariadenie alebo jednu skupinu.')
-  const payload = JSON.stringify({ id, title, message, url })
+  // Keep the account marker when an older service worker archives the payload.
+  const pushId = accountId === ownerId ? id : accountId + ':' + id
+  const payload = JSON.stringify({ id: pushId, title, message, url, accountId })
   if (Buffer.byteLength(payload) > 3500) throw new InputError('Správa a odkaz sú spolu príliš dlhé.')
-  const list = targets(deviceId, group)
-  const mobile = nativeTargets(deviceId, group)
+  const list = targets(deviceId, group, accountId)
+  const mobile = nativeTargets(deviceId, group, accountId)
   const recipient = list[0] || mobile[0]
   if (!recipient) throw new InputError('Pre tento výber nie je pripojené žiadne zariadenie.', 422)
-  startHistory(id, { title, message, url }, group || (deviceId ? recipient.name : 'Všetky zariadenia'))
+  startHistory(id, { title, message, url }, group || (deviceId ? recipient.name : 'Všetky zariadenia'), accountId)
 
   const queued = mobile.map(device => {
     const accepted = enqueueMobile(device.id, { id, title, message, url, urgency, ttl })
@@ -103,7 +105,7 @@ export async function sendPush(body, { id = randomUUID() } = {}) {
       return { deviceId: device.id, result: 'accepted' }
     } catch (error) {
       const expired = [404, 410].includes(error.statusCode)
-      if (expired) deleteDevice(device.id, device.endpoint)
+      if (expired) deleteDevice(device.id, accountId, device.endpoint)
       return { deviceId: device.id, result: expired ? 'expired' : 'failed', statusCode: error.statusCode }
     }
   }))

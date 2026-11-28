@@ -9,30 +9,31 @@ const activePolls = new Set()
 const pairAge = 10 * 60_000
 const queueSize = 100
 
-export function mobileDevices() {
-  return db.prepare("SELECT id, name, device_group AS 'group', created, 'android' AS platform FROM mobile_devices").all()
+export function mobileDevices(accountId) {
+  return db.prepare("SELECT id, name, device_group AS 'group', created, 'android' AS platform FROM mobile_devices WHERE account_id = ?").all(accountId)
 }
 
-export function createPairCode(name, group) {
+export function createPairCode(name, group, accountId) {
   const code = randomBytes(16).toString('base64url')
   const expires = Date.now() + pairAge
   const now = Date.now()
   db.prepare('DELETE FROM mobile_pair_codes WHERE expires <= ?').run(now)
   db.prepare('DELETE FROM mobile_pair_receipts WHERE expires <= ?').run(now)
-  if (db.prepare('SELECT count(*) AS total FROM mobile_pair_codes').get().total >= 30) return null
-  db.prepare('INSERT INTO mobile_pair_codes (hash, name, device_group, expires) VALUES (?, ?, ?, ?)').run(hash(code), name, group, expires)
+  if (db.prepare('SELECT count(*) AS total FROM mobile_pair_codes WHERE account_id = ?').get(accountId).total >= 30) return null
+  db.prepare('INSERT INTO mobile_pair_codes (hash, name, device_group, expires, account_id) VALUES (?, ?, ?, ?, ?)')
+    .run(hash(code), name, group, expires, accountId)
   return { code, expires }
 }
 
-export function pairStatus(code) {
+export function pairStatus(code, accountId) {
   const tokenHash = hash(code)
   const now = Date.now()
-  const linked = db.prepare('SELECT device_id FROM mobile_pair_receipts WHERE hash = ? AND expires > ?')
-    .get(tokenHash, now)
+  const linked = db.prepare('SELECT device_id FROM mobile_pair_receipts WHERE hash = ? AND expires > ? AND account_id = ?')
+    .get(tokenHash, now, accountId)
   if (linked && mobileExists(linked.device_id)) return { state: 'linked', id: linked.device_id }
 
-  const waiting = db.prepare('SELECT 1 FROM mobile_pair_codes WHERE hash = ? AND expires > ?')
-    .get(tokenHash, now)
+  const waiting = db.prepare('SELECT 1 FROM mobile_pair_codes WHERE hash = ? AND expires > ? AND account_id = ?')
+    .get(tokenHash, now, accountId)
   return { state: waiting ? 'waiting' : 'expired' }
 }
 
@@ -42,13 +43,14 @@ export function pairMobile(code) {
     const info = db.prepare('SELECT * FROM mobile_pair_codes WHERE hash = ? AND expires > ?')
       .get(hash(code), Date.now())
     if (!info) return null
-    if (deviceCount() >= config.maxDevices) return { limit: true }
+    if (deviceCount(info.account_id) >= config.maxDevices) return { limit: true }
 
     const id = randomUUID()
     const secret = 'pdr_' + token()
-    db.prepare('INSERT INTO mobile_devices VALUES (?, ?, ?, ?, ?)')
-      .run(id, hash(secret), info.name, info.device_group, Date.now())
-    db.prepare('INSERT INTO mobile_pair_receipts VALUES (?, ?, ?)').run(info.hash, id, info.expires)
+    db.prepare('INSERT INTO mobile_devices (id, hash, name, device_group, created, account_id) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, hash(secret), info.name, info.device_group, Date.now(), info.account_id)
+    db.prepare('INSERT INTO mobile_pair_receipts (hash, device_id, expires, account_id) VALUES (?, ?, ?, ?)')
+      .run(info.hash, id, info.expires, info.account_id)
     db.prepare('DELETE FROM mobile_pair_codes WHERE hash = ?').run(info.hash)
     db.exec('COMMIT')
     return { id, token: secret, name: info.name }
@@ -57,25 +59,26 @@ export function pairMobile(code) {
   }
 }
 
-export function nativeTargets(deviceId, group) {
-  return db.prepare("SELECT id, name FROM mobile_devices WHERE (? = '' OR id = ?) AND (? = '' OR device_group = ?)")
-    .all(deviceId, deviceId, group, group)
+export function nativeTargets(deviceId, group, accountId) {
+  return db.prepare("SELECT id, name FROM mobile_devices WHERE account_id = ? AND (? = '' OR id = ?) AND (? = '' OR device_group = ?)")
+    .all(accountId, deviceId, deviceId, group, group)
 }
 
 export function authenticateMobile(secret) {
-  return db.prepare('SELECT id FROM mobile_devices WHERE hash = ?').get(hash(secret))?.id
+  return db.prepare('SELECT id, account_id AS accountId FROM mobile_devices WHERE hash = ?').get(hash(secret))
 }
 
 export function mobileExists(id) {
   return Boolean(db.prepare('SELECT 1 FROM mobile_devices WHERE id = ?').get(id))
 }
 
-export function renameMobile(id, name, group) {
-  return db.prepare('UPDATE mobile_devices SET name = ?, device_group = ? WHERE id = ?').run(name, group, id).changes > 0
+export function renameMobile(id, name, group, accountId) {
+  return db.prepare('UPDATE mobile_devices SET name = ?, device_group = ? WHERE id = ? AND account_id = ?')
+    .run(name, group, id, accountId).changes > 0
 }
 
-export function removeMobile(id) {
-  const removed = db.prepare('DELETE FROM mobile_devices WHERE id = ?').run(id).changes > 0
+export function removeMobile(id, accountId) {
+  const removed = db.prepare('DELETE FROM mobile_devices WHERE id = ? AND account_id = ?').run(id, accountId).changes > 0
   if (removed) events.emit(id)
   return removed
 }

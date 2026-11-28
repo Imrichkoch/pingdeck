@@ -28,11 +28,29 @@
         <h1 id="auth-title">{{t:Pripájam sa…}}</h1>
         <p id="auth-note" class="muted"></p>
         <form id="auth-form" hidden>
+          <label id="auth-email-label" hidden>{{t:E-mail}}<input id="auth-email" name="email" type="email" autocomplete="username" maxlength="254" autocapitalize="off"></label>
           <label id="setup-label" hidden>{{t:Jednorazový kód}}<input id="setup-code" name="code" autocomplete="off" spellcheck="false"></label>
           <label>{{t:Heslo}}<input id="password" name="password" type="password" maxlength="128" required></label>
           <button class="button button-primary" id="auth-submit" type="submit">{{t:Prihlásiť sa ↗}}</button>
-          <p class="feedback" id="auth-feedback" role="status"></p>
         </form>
+        <form id="signup-form" hidden>
+          <label>{{t:E-mail}}<input id="signup-email" name="email" type="email" autocomplete="email" maxlength="254" autocapitalize="off" required></label>
+          <button class="button button-primary" type="submit">{{t:Poslať dočasné heslo}}</button>
+        </form>
+        <form id="activate-form" hidden>
+          <label>{{t:E-mail}}<input id="activate-email" name="email" type="email" autocomplete="username" maxlength="254" autocapitalize="off" required></label>
+          <label>{{t:Dočasné heslo}}<input id="temporary-password" name="temporaryPassword" type="text" autocomplete="one-time-code" maxlength="43" autocapitalize="off" spellcheck="false" required></label>
+          <label>{{t:Nové heslo}}<input name="password" type="password" autocomplete="new-password" minlength="15" maxlength="128" aria-describedby="activation-password-help" required></label>
+          <p class="muted" id="activation-password-help">{{t:Použi aspoň 15 znakov.}}</p>
+          <button class="button button-primary" type="submit">{{t:Aktivovať účet}}</button>
+        </form>
+        <p class="feedback" id="auth-feedback" role="status"></p>
+        <nav id="auth-navigation" aria-label="{{t:Prístup k účtu}}" hidden>
+          <a id="auth-login-link" href="#prihlasenie">{{t:Prihlásiť sa}}</a>
+          <a id="auth-signup-link" href="#registracia">{{t:Vytvoriť účet}}</a>
+          <a id="auth-activate-link" href="#aktivacia">{{t:Mám dočasné heslo}}</a>
+          <a id="auth-owner-link" href="#spravca">{{t:Prístup správcu}}</a>
+        </nav>
       </div>
     </section>
 

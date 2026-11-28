@@ -86,6 +86,10 @@ Odoslanie pozvánky e-mailom zapneš cez PAIR_SMTP_HOST, PAIR_SMTP_PORT (predvol
 
 Prijímací kľúč povoľuje čítanie a potvrdenie správ iba pre spárovaný telefón. Android čaká na správy cez HTTPS pomocou služby s trvalým oznámením. Pozastavené správy ostanú vo fronte do nastavenej platnosti, najviac 100 na zariadenie. TTL 0 vyžaduje aktívne čakanie telefónu. Po reštarte telefónu môžeš príjem znova zapnúť v aplikácii. Na iPhone a iPade je klient dostupný ako webová aplikácia so schránkou správ na /iphone-app. Otvor ju v Safari a pridaj na plochu. Schránka uchováva posledných 100 doručených správ lokálne v prehliadači.
 
+## Používateľské účty
+
+Po nastavení PAIR_SMTP zapni verejnú registráciu nastavením REGISTRATION_ENABLED=1. Používateľ dostane jednorazové dočasné heslo s platnosťou 30 minút a pri aktivácii si nastaví vlastné heslo s aspoň 15 znakmi. Účty majú vlastné zariadenia, skupiny, API kľúče a históriu. Párovací e-mail možno poslať na overenú adresu účtu. Existujúci správca sa prihlasuje cez odkaz **Prístup správcu** a spravuje svoje doterajšie zariadenia a integrácie.
+
 ## E-mailový príjem
 
 Vytvor vyhradenú IMAP schránku s dlhou náhodnou lokálnou časťou. V .env nastav MAIL_IMAP_HOST, MAIL_IMAP_ADDRESS a MAIL_IMAP_PASSWORD. Brána používa IMAPS s overením certifikátu. Prihlasovacie údaje patria do súkromného prostredia servera. Prijímacia adresa je dostupná po prihlásení v sekcii Integrácie. Každý, kto ju pozná, môže poslať upozornenie, preto ju zdieľaj iba s dôveryhodnými integráciami.

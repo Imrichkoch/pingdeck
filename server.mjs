@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.mjs'
 import { acceptLanguage, translate } from './public/locale.js'
-import { emailPairing, pairingImage, pairingLink } from './pairing-mail.mjs'
+import { emailRegistration, emailPairing, pairingImage, pairingLink } from './pairing-mail.mjs'
 import * as store from './store.mjs'
 import * as mobile from './mobile-store.mjs'
 import { startMailGateway, stopMailGateway } from './mail.mjs'
@@ -77,6 +77,9 @@ function page(file, res) {
     defaultTitle: html(brand.defaultTitle),
     base,
     endpoint: html(config.origin + base + '/api/v1/push'),
+    panelButton: config.registrationEnabled ? 'button-outline' : 'button-primary',
+    registrationLink: config.registrationEnabled
+      ? '<a class="button button-primary" href="' + base + '/app#registracia">' + t('Vytvoriť účet ↗') + '</a>' : '',
     androidLink: apk ? '<a class="button button-outline" href="' + base + '/android">Android ↓</a>' : '',
     sourceLink: src ? `<a class="button button-outline" href="${base}/source.zip">${t('Stiahnuť kód ↓')}</a>` : ''
   }
@@ -172,8 +175,12 @@ function session(req) {
   return /^[\w-]{43}$/.test(value ?? '') ? value : ''
 }
 
-function requireOwner(req, res, next) {
-  if (!store.activeSession(session(req))) throw new InputError('Prihlás sa do panelu.', 401)
+function requireAccount(req, res, next) {
+  req.accountId = store.sessionAccount(session(req))
+  const expected = req.get('x-pingdeck-account')
+  if (!req.accountId || (expected && expected !== req.accountId)) {
+    throw new InputError('Prihlás sa do panelu.', 401)
+  }
   next()
 }
 
@@ -184,13 +191,71 @@ function sameOrigin(req, res, next) {
   next()
 }
 
-api.get('/session', (req, res) => res.json({
-  authenticated: store.activeSession(session(req)),
-  needsSetup: !store.setting('password')
-}))
+api.get('/session', (req, res) => {
+  const accountId = store.sessionAccount(session(req))
+  res.json({
+    authenticated: Boolean(accountId),
+    accountId: accountId || undefined,
+    needsSetup: !store.setting('password'),
+    registrationEnabled: config.registrationEnabled
+  })
+})
+
+function signIn(req, res, accountId) {
+  store.deleteSession(session(req))
+  res.cookie(cookie, store.createSession(accountId), { ...cookieOptions, maxAge: store.sessionAge })
+  res.json({ ok: true, accountId })
+}
+
+function emailAddress(value) {
+  if (typeof value !== 'string') return ''
+  const email = value.trim().toLowerCase()
+  const local = email.split('@')[0]
+  if (email.length > 254 || local.length > 64 || local.startsWith('.') || local.endsWith('.') ||
+      local.includes('..') || !/^[a-z\d._%+-]+@[a-z\d]+(?:[.-][a-z\d]+)*\.[a-z]{2,63}$/.test(email) ||
+      email === config.mail?.address.toLowerCase()) return ''
+  return email
+}
+
+const badActivation = 'Dočasné heslo je neplatné, použité alebo vypršalo.'
+
+api.post('/register', sameOrigin, (req, res) => {
+  if (!config.registrationEnabled) throw new InputError('Registrácia momentálne nie je dostupná.', 503)
+  throttle('register:' + req.ip, 6, 60 * minute)
+  throttle('register-global', 40, 60 * minute)
+  const email = emailAddress(body(req).email)
+  if (!email) throw new InputError('Zadaj platnú e-mailovú adresu.')
+  const password = store.issueRegistration(email)
+  if (password) {
+    void emailRegistration({ to: email, password, language: languageFor(req) }).catch(error => {
+      store.cancelRegistration(email, password)
+      console.warn('Registration email failed:', error.code ?? error.name)
+    })
+  }
+  res.status(202).json({ ok: true })
+})
+
+api.post('/activate', sameOrigin, async (req, res) => {
+  throttle('activate:' + req.ip, 12, 15 * minute)
+  const data = body(req)
+  const email = emailAddress(data.email)
+  const temporary = typeof data.temporaryPassword === 'string' ? data.temporaryPassword.trim() : ''
+  if (!email || !/^[\w-]{43}$/.test(temporary) || !store.validRegistration(email, temporary)) {
+    throw new InputError(badActivation, 401)
+  }
+  const password = data.password
+  if (typeof password !== 'string' || password.length < 15 || password.length > 128 || !password.trim()) {
+    throw new InputError('Heslo musí mať 15 až 128 znakov.')
+  }
+  if (password === temporary) throw new InputError('Zvoľ si iné heslo, než je dočasné heslo.')
+  const accountId = store.finishRegistration(email, temporary, await store.accountPasswordHash(password))
+  if (!accountId) throw new InputError(badActivation, 401)
+  signIn(req, res.status(201), accountId)
+})
 
 api.post('/setup', sameOrigin, async (req, res) => {
-  const { code, password } = body(req)
+  const { code: input, password } = body(req)
+  const code = typeof input === 'string' ? input.trim() : ''
   throttle('auth:' + req.ip, 10, 15 * minute)
   if (typeof code !== 'string' || !/^[\w-]{43}$/.test(code) || !store.validSetup(code)) {
     throw new InputError('Neplatný alebo použitý inštalačný kód.', 401)
@@ -201,18 +266,22 @@ api.post('/setup', sameOrigin, async (req, res) => {
   if (!store.finishSetup(code, await store.passwordHash(password))) {
     throw new InputError('Tento inštalačný kód už bol použitý.', 409)
   }
-  res.cookie(cookie, store.createSession(), { ...cookieOptions, maxAge: store.sessionAge }).status(201).json({ ok: true })
+  signIn(req, res.status(201), store.ownerId)
 })
 
 api.post('/login', sameOrigin, async (req, res) => {
-  const { password } = body(req)
-  throttle('auth:' + req.ip, 10, 15 * minute)
-  if (typeof password !== 'string' || !password || password.length > 128 || !await store.validPassword(password)) {
-    throw new InputError('Heslo je nesprávne.', 401)
-  }
-  limits.delete('auth:' + req.ip)
-  store.deleteSession(session(req))
-  res.cookie(cookie, store.createSession(), { ...cookieOptions, maxAge: store.sessionAge }).json({ ok: true })
+  const { email, password } = body(req)
+  const ownerLogin = email === undefined
+  const limit = (ownerLogin ? 'owner-auth:' : 'auth:') + req.ip
+  throttle(limit, 10, 15 * minute)
+  const badLogin = ownerLogin ? 'Heslo je nesprávne.' : 'E-mail alebo heslo je nesprávne.'
+  if (typeof password !== 'string' || !password || password.length > 128) throw new InputError(badLogin, 401)
+  const accountId = ownerLogin
+    ? (await store.validPassword(password) ? store.ownerId : undefined)
+    : await store.loginAccount(emailAddress(email), password)
+  if (!accountId) throw new InputError(badLogin, 401)
+  limits.delete(limit)
+  signIn(req, res, accountId)
 })
 
 api.post('/logout', sameOrigin, (req, res) => {
@@ -220,67 +289,70 @@ api.post('/logout', sameOrigin, (req, res) => {
   res.clearCookie(cookie, cookieOptions).status(204).end()
 })
 
-api.get('/overview', requireOwner, (req, res) => res.json({
-  devices: [...store.devices(), ...mobile.mobileDevices()].sort((a, b) => b.created - a.created),
-  emailAddress: config.mail?.address ?? '',
+api.get('/overview', requireAccount, (req, res) => res.json({
+  devices: [...store.devices(req.accountId), ...mobile.mobileDevices(req.accountId)].sort((a, b) => b.created - a.created),
+  emailAddress: req.accountId === store.ownerId ? (config.mail?.address ?? '') : '',
+  accountEmail: store.accountEmail(req.accountId),
   androidAvailable: Boolean(apk),
   pairingEmailAvailable: Boolean(config.pairMail),
-  keys: store.apiKeys(),
-  history: store.recentHistory(),
+  keys: store.apiKeys(req.accountId),
+  history: store.recentHistory(req.accountId),
   vapidPublicKey
 }))
 
-api.post('/devices', sameOrigin, requireOwner, (req, res) => {
+api.post('/devices', sameOrigin, requireAccount, (req, res) => {
   const data = body(req)
-  const id = store.saveDevice(text(data.name, 'názov', 48, true), text(data.group, 'skupina', 48),
-    pushSubscription(data.subscription))
-  if (!id) throw new InputError('Dosiahol sa limit zariadení tejto inštancie.', 409)
+  const { id, conflict } = store.saveDevice(text(data.name, 'názov', 48, true), text(data.group, 'skupina', 48),
+    pushSubscription(data.subscription), req.accountId)
+  if (conflict) throw new InputError('Prehliadač je spojený s iným účtom. Odpoj ho v pôvodnom účte alebo použi iný profil prehliadača.', 409)
+  if (!id) throw new InputError('Dosiahol sa limit zariadení.', 409)
   res.status(201).json({ id })
 })
 
-api.patch('/devices/:id', sameOrigin, requireOwner, (req, res) => {
+api.patch('/devices/:id', sameOrigin, requireAccount, (req, res) => {
   const data = body(req)
   const name = text(data.name, 'názov', 48, true)
   const group = text(data.group, 'skupina', 48)
-  if (!store.updateDevice(req.params.id, name, group) && !mobile.renameMobile(req.params.id, name, group)) {
+  if (!store.updateDevice(req.params.id, name, group, req.accountId) &&
+      !mobile.renameMobile(req.params.id, name, group, req.accountId)) {
     throw new InputError('Zariadenie sa nenašlo.', 404)
   }
   res.status(204).end()
 })
 
-api.delete('/devices/:id', sameOrigin, requireOwner, (req, res) => {
-  if (!store.deleteDevice(req.params.id) && !mobile.removeMobile(req.params.id)) throw new InputError('Zariadenie sa nenašlo.', 404)
+api.delete('/devices/:id', sameOrigin, requireAccount, (req, res) => {
+  if (!store.deleteDevice(req.params.id, req.accountId) && !mobile.removeMobile(req.params.id, req.accountId)) throw new InputError('Zariadenie sa nenašlo.', 404)
   res.status(204).end()
 })
 
-api.post('/keys', sameOrigin, requireOwner, (req, res) => {
+api.post('/keys', sameOrigin, requireAccount, (req, res) => {
   const data = body(req)
-  if (store.apiKeys().length >= 30) throw new InputError('Dosiahol sa limit 30 kľúčov.', 409)
-  res.status(201).json({ token: store.createApiKey(text(data.label, 'názov', 48, true)) })
+  if (store.apiKeys(req.accountId).length >= 30) throw new InputError('Dosiahol sa limit 30 kľúčov.', 409)
+  res.status(201).json({ token: store.createApiKey(text(data.label, 'názov', 48, true), req.accountId) })
 })
 
-api.delete('/keys/:id', sameOrigin, requireOwner, (req, res) => {
-  if (!store.deleteApiKey(req.params.id)) throw new InputError('Kľúč sa nenašiel.', 404)
+api.delete('/keys/:id', sameOrigin, requireAccount, (req, res) => {
+  if (!store.deleteApiKey(req.params.id, req.accountId)) throw new InputError('Kľúč sa nenašiel.', 404)
   res.status(204).end()
 })
 
-api.post('/mobile/codes', sameOrigin, requireOwner, async (req, res) => {
+api.post('/mobile/codes', sameOrigin, requireAccount, async (req, res) => {
   const data = body(req)
-  const result = mobile.createPairCode(text(data.name, 'názov', 48, true), text(data.group, 'skupina', 48))
+  const result = mobile.createPairCode(text(data.name, 'názov', 48, true), text(data.group, 'skupina', 48), req.accountId)
   if (!result) throw new InputError('Je vytvorených príliš veľa platných kódov.', 429)
   const png = await pairingImage(result.code)
   res.status(201).json({ ...result, link: pairingLink(result.code), qr: 'data:image/png;base64,' + png.toString('base64') })
 })
 
-api.post('/mobile/codes/email', sameOrigin, requireOwner, async (req, res) => {
+api.post('/mobile/codes/email', sameOrigin, requireAccount, async (req, res) => {
   if (!config.pairMail) throw new InputError('Odosielanie párovacích e-mailov nie je nastavené.', 503)
   const { code, email } = body(req)
-  const recipient = typeof email === 'string' ? email.trim() : ''
-  if (recipient.length > 254 || !/^[a-z\d._%+-]+@[a-z\d]+(?:[.-][a-z\d]+)*\.[a-z]{2,63}$/i.test(recipient) ||
-      recipient.toLowerCase() === config.mail?.address.toLowerCase()) {
-    throw new InputError('Zadaj platnú e-mailovú adresu príjemcu.')
+  const recipient = emailAddress(email)
+  if (!recipient) throw new InputError('Zadaj platnú e-mailovú adresu príjemcu.')
+  if (req.accountId !== store.ownerId && recipient !== store.accountEmail(req.accountId)) {
+    throw new InputError('Párovací e-mail môžeš poslať na adresu svojho účtu.', 403)
   }
-  if (typeof code !== 'string' || !/^[\w-]{22}$/.test(code) || mobile.pairStatus(code).state !== 'waiting') {
+  if (typeof code !== 'string' || !/^[\w-]{22}$/.test(code) || mobile.pairStatus(code, req.accountId).state !== 'waiting') {
     throw new InputError('Párovací kód už nie je platný. Vytvor nový.', 409)
   }
   throttle('pair-email', 5)
@@ -294,12 +366,12 @@ api.post('/mobile/codes/email', sameOrigin, requireOwner, async (req, res) => {
   res.status(204).end()
 })
 
-api.post('/mobile/codes/status', sameOrigin, requireOwner, (req, res) => {
+api.post('/mobile/codes/status', sameOrigin, requireAccount, (req, res) => {
   const { code } = body(req)
   if (typeof code !== 'string' || !/^[\w-]{22}$/.test(code)) {
     throw new InputError('Neplatný alebo použitý párovací kód.')
   }
-  res.json(mobile.pairStatus(code))
+  res.json(mobile.pairStatus(code, req.accountId))
 })
 
 api.post('/mobile/pair', (req, res) => {
@@ -316,8 +388,10 @@ api.post('/mobile/pair', (req, res) => {
 
 function requireMobile(req, res, next) {
   const value = req.get('authorization')?.match(/^Bearer (pdr_[\w-]{43})$/i)?.[1]
-  req.mobileId = value && mobile.authenticateMobile(value)
-  if (!req.mobileId) throw new InputError('Telefón treba znova spárovať.', 401)
+  const device = value && mobile.authenticateMobile(value)
+  if (!device) throw new InputError('Telefón treba znova spárovať.', 401)
+  req.mobileId = device.id
+  req.accountId = device.accountId
   next()
 }
 
@@ -343,13 +417,13 @@ api.post('/mobile/ack', requireMobile, (req, res) => {
 })
 
 api.delete('/mobile/device', requireMobile, (req, res) => {
-  mobile.removeMobile(req.mobileId)
+  mobile.removeMobile(req.mobileId, req.accountId)
   res.status(204).end()
 })
 
 let inFlight = 0
 async function limitedSend(data, options = {}) {
-  throttle('send', config.sendsPerMinute)
+  throttle('send:' + (options.accountId ?? store.ownerId), config.sendsPerMinute)
   if (inFlight >= 4) throw new InputError('Prebieha už viacero odoslaní. Skús to o chvíľu.', 429)
   inFlight++
   try {
@@ -360,23 +434,23 @@ async function limitedSend(data, options = {}) {
 }
 
 async function dispatch(req, res) {
-  const result = await limitedSend(body(req))
+  const result = await limitedSend(body(req), { accountId: req.accountId })
   if (req.apiKeyId) store.markApiKeyUsed(req.apiKeyId)
   res.status(result.accepted ? 202 : 502).json(result)
 }
 
-api.post('/devices/:id/test', sameOrigin, requireOwner, async (req, res) => {
+api.post('/devices/:id/test', sameOrigin, requireAccount, async (req, res) => {
   const language = languageFor(req)
   const result = await limitedSend({
     deviceId: req.params.id,
     title: translate(language, 'Testovacia správa z PingDecku'),
     message: translate(language, 'Ak vidíš túto správu, upozornenia fungujú.'),
     ttl: 300
-  })
+  }, { accountId: req.accountId })
   res.status(result.accepted ? 202 : 502).json(result)
 })
 
-api.post('/send', sameOrigin, requireOwner, (req, res, next) => {
+api.post('/send', sameOrigin, requireAccount, (req, res, next) => {
   const { deviceId, group, broadcast } = body(req)
   const hasTarget = (typeof deviceId === 'string' && Boolean(deviceId.trim())) ||
     (typeof group === 'string' && Boolean(group.trim()))
@@ -387,11 +461,13 @@ api.post('/send', sameOrigin, requireOwner, (req, res, next) => {
 }, dispatch)
 api.post('/v1/push', (req, res, next) => {
   const raw = req.get('authorization')?.match(/^Bearer (pd_[\w-]{43})$/i)?.[1]
-  req.apiKeyId = raw && store.verifyApiKey(raw)
-  if (!req.apiKeyId) {
+  const key = raw && store.verifyApiKey(raw)
+  if (!key) {
     res.set('WWW-Authenticate', 'Bearer realm="PingDeck"')
     throw new InputError('Je potrebný platný API kľúč typu Bearer.', 401)
   }
+  req.apiKeyId = key.id
+  req.accountId = key.accountId
   next()
 }, dispatch)
 api.use((req, res) => res.status(404).json({ error: 'Rozhranie sa nenašlo.' }))
@@ -405,7 +481,10 @@ app.use((error, req, res, next) => {
     : status === 413 ? 'Požiadavka je príliš veľká.'
       : status === 400 ? 'Neplatný JSON.' : 'Interná chyba servera.'
   if (status === 500) console.error(error)
-  if (status === 429) res.set('Retry-After', req.path === '/login' || req.path === '/setup' ? '900' : '60')
+  if (status === 429) {
+    const retry = req.path === '/register' ? '3600' : ['/login', '/setup', '/activate'].includes(req.path) ? '900' : '60'
+    res.set('Retry-After', retry)
+  }
   const language = languageFor(req)
   res.set('Content-Language', language)
   res.status(status).json({ error: translate(language, message) })

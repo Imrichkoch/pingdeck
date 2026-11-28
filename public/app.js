@@ -7,7 +7,7 @@ const { base, name: brand, defaultTitle } = document.body.dataset
 const link = path => base + path
 const allDevicesStoredValue = 'Všetky zariadenia'
 const date = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
-const state = { needsSetup: false, devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false }
+const state = { accountId: '', registrationEnabled: false, needsSetup: false, accountEmail: '', devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false }
 const views = [...document.querySelectorAll('[data-view]')]
 let reloadVersion = 0
 let testDeviceId = ''
@@ -19,13 +19,18 @@ function clearPairingResult() {
   $('#pair-open').removeAttribute('href')
   $('#pair-result').hidden = true
   $('#pair-email-form').reset()
+  $('#pair-email-form input[name="email"]').value = state.accountEmail
   feedback('pair-email-feedback')
 }
 
 async function request(path, { method = 'GET', data } = {}) {
   const response = await fetch(link('/api' + path), {
     method,
-    headers: { 'Accept-Language': language, ...(data ? { 'Content-Type': 'application/json' } : {}) },
+    headers: {
+      'Accept-Language': language,
+      ...(data ? { 'Content-Type': 'application/json' } : {}),
+      ...(state.accountId ? { 'X-PingDeck-Account': state.accountId } : {})
+    },
     body: data ? JSON.stringify(data) : undefined
   })
   if (response.status === 204) return
@@ -69,14 +74,14 @@ function onSubmit(id, output, run) {
   form.addEventListener('submit', event => {
     event.preventDefault()
     const data = Object.fromEntries(new FormData(form))
-    void action(form.querySelector('[type="submit"]'), output, () => run(data, form), id !== 'auth-form')()
+    void action(form.querySelector('[type="submit"]'), output, () => run(data, form), !['auth-form', 'signup-form', 'activate-form'].includes(id))()
   })
 }
 
 function showEntrance(needsSetup) {
   ++reloadVersion
   state.needsSetup = needsSetup
-  Object.assign(state, { devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false })
+  Object.assign(state, { accountId: '', accountEmail: '', devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false })
   clearSecret()
   clearPairingResult()
   $('#pair-form').reset()
@@ -86,22 +91,46 @@ function showEntrance(needsSetup) {
   $('#send-form').reset()
   $('#device-form').reset()
   $('#key-form').reset()
+  browserPush = undefined
   $('#auth-form').reset()
+  $('#activate-form').reset()
   $('#edit-device').close()
   updatePreview()
   $('#logout').hidden = true
   $('#workspace').hidden = true
   $('#entrance').hidden = false
-  $('#auth-form').hidden = false
-  $('#setup-label').hidden = !needsSetup
-  $('#setup-code').required = needsSetup
-  $('#password').autocomplete = needsSetup ? 'new-password' : 'current-password'
-  $('#password').minLength = needsSetup ? 12 : 0
-  $('#auth-title').textContent = needsSetup ? t('Nastav si prístup') : t('Prihlásenie')
-  $('#auth-note').textContent = needsSetup
-    ? t('Zadaj jednorazový inštalačný kód a zvoľ si heslo s aspoň 12 znakmi.')
-    : t('Prihlás sa heslom správcu tejto inštancie.')
-  $('#auth-submit').textContent = needsSetup ? t('Vytvoriť prístup ↗') : t('Prihlásiť sa ↗')
+  renderEntrance()
+}
+
+function renderEntrance() {
+  const hash = location.hash
+  const signup = state.registrationEnabled && hash === '#registracia'
+  const activate = hash === '#aktivacia'
+  const owner = hash === '#spravca' || (state.needsSetup && hash !== '#prihlasenie' && !signup && !activate)
+  const setup = owner && state.needsSetup
+  $('#auth-form').hidden = signup || activate
+  $('#signup-form').hidden = !signup
+  $('#activate-form').hidden = !activate
+  $('#auth-navigation').hidden = false
+  $('#auth-login-link').hidden = !signup && !activate && !owner
+  $('#auth-signup-link').hidden = signup || !state.registrationEnabled
+  $('#auth-activate-link').hidden = activate || !state.registrationEnabled
+  $('#auth-owner-link').hidden = owner
+  $('#auth-email-label').hidden = owner
+  $('#auth-email').disabled = owner
+  $('#auth-email').required = !owner
+  $('#setup-label').hidden = !setup
+  $('#setup-code').disabled = !setup
+  $('#setup-code').required = setup
+  $('#password').autocomplete = setup ? 'new-password' : 'current-password'
+  $('#password').minLength = setup ? 12 : 0
+  $('#auth-title').textContent = t(signup ? 'Vytvor si účet' : activate ? 'Aktivuj si účet' :
+    setup ? 'Nastav si prístup' : owner ? 'Prístup správcu' : 'Prihlásenie')
+  $('#auth-note').textContent = t(signup ? 'Na e-mail ti pošleme dočasné heslo na aktiváciu účtu.' :
+    activate ? 'Zadaj dočasné heslo z e-mailu a nastav si vlastné heslo.' :
+    setup ? 'Zadaj jednorazový inštalačný kód a zvoľ si heslo s aspoň 12 znakmi.' :
+    owner ? 'Prihlás sa heslom správcu tejto inštancie.' : 'Prihlás sa e-mailom a heslom svojho účtu.')
+  $('#auth-submit').textContent = t(setup ? 'Vytvoriť prístup ↗' : 'Prihlásiť sa ↗')
 }
 
 function showWorkspace() {
@@ -169,6 +198,9 @@ function render() {
   $('#pair-email-form').hidden = !state.pairingEmailAvailable
   $('#mail-panel').hidden = !state.emailAddress
   $('#mail-address').value = state.emailAddress
+  const recipient = $('#pair-email-form input[name="email"]')
+  recipient.readOnly = Boolean(state.accountEmail)
+  if (recipient.readOnly) recipient.value = state.accountEmail
   const groups = [...new Set(state.devices.map(device => device.group).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, language))
   $('#device-count').textContent = state.devices.length
@@ -248,7 +280,7 @@ function decodeKey(value) {
 
 function deviceStorage(value) {
   try {
-    const key = 'pingdeck:device:' + base
+    const key = 'pingdeck:device:' + base + (state.accountId === 'owner' ? '' : ':' + state.accountId)
     if (value === null) localStorage.removeItem(key)
     else if (value !== undefined) localStorage.setItem(key, value)
     return localStorage.getItem(key)
@@ -414,14 +446,35 @@ for (const button of document.querySelectorAll('#device-platform button')) {
 $('#wizard-test').addEventListener('click', action($('#wizard-test'), 'wizard-test-feedback',
   () => sendTest(testDeviceId, 'wizard-test-feedback')))
 
-onSubmit('auth-form', 'auth-feedback', async (data, form) => {
-  const { code, password } = data
-  await request(state.needsSetup ? '/setup' : '/login', {
-    method: 'POST', data: state.needsSetup ? { code: code.trim(), password } : { password }
-  })
-  form.reset()
+async function openAccount(accountId) {
+  state.accountId = accountId
   await reload()
+  if (['#registracia', '#aktivacia', '#spravca', '#prihlasenie'].includes(location.hash)) {
+    history.replaceState(null, '', location.pathname + location.search + '#prehlad')
+  }
   showWorkspace()
+}
+
+onSubmit('auth-form', 'auth-feedback', async (data, form) => {
+  const route = data.code === undefined ? '/login' : '/setup'
+  const { accountId } = await request(route, { method: 'POST', data })
+  form.reset()
+  await openAccount(accountId)
+})
+
+onSubmit('signup-form', 'auth-feedback', async ({ email }) => {
+  await request('/register', { method: 'POST', data: { email } })
+  history.replaceState(null, '', location.pathname + location.search + '#aktivacia')
+  $('#activate-email').value = email.trim()
+  renderEntrance()
+  feedback('auth-feedback', t('Ak je možné založiť účet, dočasné heslo príde e-mailom. Skontroluj aj priečinok Spam.'))
+  $('#temporary-password').focus()
+})
+
+onSubmit('activate-form', 'auth-feedback', async (data, form) => {
+  const { accountId } = await request('/activate', { method: 'POST', data })
+  form.reset()
+  await openAccount(accountId)
 })
 
 onSubmit('pair-form', 'pair-feedback', async (data, form) => {
@@ -506,15 +559,20 @@ $('#cancel-edit').addEventListener('click', () => $('#edit-device').close())
 $('#send-form').addEventListener('input', updatePreview)
 window.addEventListener('hashchange', () => {
   if (location.hash === '#main') return
+  if (!$('#entrance').hidden) {
+    feedback('auth-feedback')
+    renderEntrance()
+    return
+  }
   navigate()
   if (location.hash === '#zariadenia') suggestPlatform()
 })
 
 try {
   const session = await request('/session')
+  state.registrationEnabled = session.registrationEnabled
   if (session.authenticated) {
-    await reload()
-    showWorkspace()
+    await openAccount(session.accountId)
   } else {
     showEntrance(session.needsSetup)
   }

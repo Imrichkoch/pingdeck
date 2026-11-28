@@ -5,6 +5,7 @@ const t = source => translate(language, source)
 const statusLine = document.querySelector('#inbox-status')
 const list = document.querySelector('#inbox-list')
 const setup = document.querySelector('#inbox-setup')
+const signIn = document.querySelector('#inbox-login')
 const basePath = document.body.dataset.base
 const formatDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -35,20 +36,41 @@ function makeCard(entry) {
   return card
 }
 
+let inboxVersion = 0
+
 async function updateInbox() {
+  const version = ++inboxVersion
+  statusLine.textContent = t('Načítavam správy…')
+  list.replaceChildren()
+  setup.hidden = true
+  signIn.hidden = true
   let subscription
   try {
+    const response = await fetch(basePath + '/api/session', { cache: 'no-store' })
+    if (!response.ok) throw new Error('Session unavailable')
+    const session = await response.json()
+    if (version !== inboxVersion) return
+    if (!session.authenticated) {
+      statusLine.textContent = t('Prihlás sa, aby sa zobrazili správy tvojho účtu.')
+      signIn.hidden = false
+      return
+    }
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration(basePath + '/')
       subscription = await registration?.pushManager?.getSubscription()
     }
-    const entries = await PingDeckInbox.list()
+    const entries = (await PingDeckInbox.list()).filter(entry => {
+      const owner = entry.accountId ?? (entry.id.includes(':') ? entry.id.split(':', 1)[0] : 'owner')
+      return owner === session.accountId
+    })
+    if (version !== inboxVersion) return
     list.replaceChildren(...entries.map(makeCard))
     setup.hidden = Boolean(subscription)
     statusLine.textContent = entries.length ? t('Správy uložené v tomto zariadení.') : subscription
       ? t('Keď príde upozornenie, zobrazí sa tu.')
       : t('Pripoj zariadenie v paneli, aby mohlo prijímať upozornenia.')
   } catch {
+    if (version !== inboxVersion) return
     statusLine.textContent = t('Schránku správ sa nepodarilo načítať.')
   }
 }

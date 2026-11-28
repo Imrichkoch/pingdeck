@@ -14,7 +14,8 @@ self.addEventListener('push', event => {
     title: payload?.title || 'Push upozornenie',
     message: payload?.message || '',
     url: payload?.url || '',
-    received: Date.now()
+    received: Date.now(),
+    accountId: payload?.accountId
   }
   const display = self.registration.showNotification(entry.title, {
     body: entry.message,
@@ -25,8 +26,8 @@ self.addEventListener('push', event => {
   })
   const archive = PingDeckInbox.save(entry).then(async () => {
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    const inbox = new URL('iphone-app', scope).href
-    for (const client of clients) if (client.url === inbox) client.postMessage('pingdeck-inbox')
+    const inbox = new URL('iphone-app', scope)
+    for (const client of clients) if (new URL(client.url).pathname === inbox.pathname) client.postMessage('pingdeck-inbox')
   }).catch(() => {})
   event.waitUntil(Promise.all([display, archive]))
 })

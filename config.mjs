@@ -70,6 +70,7 @@ export const config = Object.freeze({
   vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:admin@example.com',
   mail,
   pairMail,
+  registrationEnabled: process.env.REGISTRATION_ENABLED === '1' && Boolean(pairMail),
   androidApk: process.env.ANDROID_APK ? resolve(process.env.ANDROID_APK) : '',
   sourceArchive: process.env.SOURCE_ARCHIVE ? resolve(process.env.SOURCE_ARCHIVE) : ''
 })
