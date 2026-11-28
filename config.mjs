@@ -43,6 +43,18 @@ if (mail && (!mailPassword || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailAddress))) 
   throw new Error('Pre Mailu nastav MAIL_IMAP_ADDRESS a MAIL_IMAP_PASSWORD.')
 }
 
+const pairMailHost = process.env.PAIR_SMTP_HOST ?? ''
+const pairMail = pairMailHost ? {
+  host: pairMailHost,
+  port: integer('PAIR_SMTP_PORT', 465, 1, 65535),
+  address: process.env.PAIR_SMTP_ADDRESS ?? '',
+  password: process.env.PAIR_SMTP_PASSWORD ?? ''
+} : null
+if (pairMail && (!pairMail.password || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pairMail.address) ||
+                 pairMail.address.toLowerCase() === mail?.address.toLowerCase())) {
+  throw new Error('PAIR_SMTP vyžaduje vlastnú odosielaciu schránku a heslo.')
+}
+
 export const config = Object.freeze({
   brand,
   origin: origin.origin,
@@ -57,6 +69,7 @@ export const config = Object.freeze({
   sendsPerMinute: integer('SENDS_PER_MINUTE', 30, 1, 120),
   vapidSubject: process.env.VAPID_SUBJECT ?? 'mailto:admin@example.com',
   mail,
+  pairMail,
   androidApk: process.env.ANDROID_APK ? resolve(process.env.ANDROID_APK) : '',
   sourceArchive: process.env.SOURCE_ARCHIVE ? resolve(process.env.SOURCE_ARCHIVE) : ''
 })

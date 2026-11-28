@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="{{lang}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f2ea">
+  <meta name="robots" content="noindex">
+  <title>{{name}} — {{t:Spáruj Android s PingDeckom}}</title>
+  <link rel="icon" href="{{base}}/icon-192.png">
+  <link rel="stylesheet" href="{{base}}/site.css">
+  <script type="module" src="{{base}}/language.js"></script>
+  <script type="module" src="{{base}}/pair-fallback.js"></script>
+</head>
+<body>
+  <header class="site-header"><div class="shell header-inner">
+    <a href="{{base}}/" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
+    <div class="header-tools">{{languageSwitch}}</div>
+  </div></header>
+  <main class="shell install-shell">
+    <h1>{{t:Spáruj Android s PingDeckom}}</h1>
+    <p>{{t:Ak sa PingDeck neotvoril, skopíruj kód a zadaj ho v Android aplikácii.}}</p>
+    <div class="new-key" id="pair-fallback" hidden>
+      <label>{{t:Párovací kód}} <input id="pair-fallback-code" readonly spellcheck="false"></label>
+      <button class="button button-outline" id="pair-fallback-copy" type="button">{{t:Kopírovať kód}}</button>
+    </div>
+    <p class="feedback" id="pair-fallback-feedback" role="status"></p>
+    <div class="actions">{{androidLink}}</div>
+  </main>
+</body>
+</html>

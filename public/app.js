@@ -7,11 +7,20 @@ const { base, name: brand, defaultTitle } = document.body.dataset
 const link = path => base + path
 const allDevicesStoredValue = 'Všetky zariadenia'
 const date = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
-const state = { needsSetup: false, devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '' }
+const state = { needsSetup: false, devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false }
 const views = [...document.querySelectorAll('[data-view]')]
 let reloadVersion = 0
 let testDeviceId = ''
 let pairing
+
+function clearPairingResult() {
+  $('#pair-code').value = ''
+  $('#pair-qr-image').removeAttribute('src')
+  $('#pair-open').removeAttribute('href')
+  $('#pair-result').hidden = true
+  $('#pair-email-form').reset()
+  feedback('pair-email-feedback')
+}
 
 async function request(path, { method = 'GET', data } = {}) {
   const response = await fetch(link('/api' + path), {
@@ -67,10 +76,9 @@ function onSubmit(id, output, run) {
 function showEntrance(needsSetup) {
   ++reloadVersion
   state.needsSetup = needsSetup
-  Object.assign(state, { devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '' })
+  Object.assign(state, { devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '', pairingEmailAvailable: false })
   clearSecret()
-  $('#pair-code').value = ''
-  $('#pair-result').hidden = true
+  clearPairingResult()
   $('#pair-form').reset()
   pairing = undefined
   choosePlatform('')
@@ -158,6 +166,7 @@ const statuses = {
 function formatDate(value) { return date.format(new Date(value)) }
 
 function render() {
+  $('#pair-email-form').hidden = !state.pairingEmailAvailable
   $('#mail-panel').hidden = !state.emailAddress
   $('#mail-address').value = state.emailAddress
   const groups = [...new Set(state.devices.map(device => device.group).filter(Boolean))]
@@ -368,8 +377,7 @@ async function watchPairing(pending) {
       if (pairing !== pending) return
       if (status.state === 'waiting') continue
       pairing = undefined
-      $('#pair-code').value = ''
-      $('#pair-result').hidden = true
+      clearPairingResult()
       if (status.state === 'linked') {
         if (!$('#android-pairing').hidden) testDeviceId = status.id
         await reload()
@@ -417,14 +425,24 @@ onSubmit('auth-form', 'auth-feedback', async (data, form) => {
 })
 
 onSubmit('pair-form', 'pair-feedback', async (data, form) => {
-  const { code } = await request('/mobile/codes', { method: 'POST', data })
+  const { code, qr, link: openLink } = await request('/mobile/codes', { method: 'POST', data })
+  clearPairingResult()
   const pending = { code, deadline: performance.now() + 10 * 60_000 }
   pairing = pending
   $('#pair-code').value = code
+  $('#pair-qr-image').src = qr
+  $('#pair-open').href = openLink
   $('#pair-result').hidden = false
   form.reset()
   feedback('pair-feedback', t('Kód platí 10 minút a dá sa použiť raz.'))
   void watchPairing(pending)
+})
+
+onSubmit('pair-email-form', 'pair-email-feedback', async ({ email }) => {
+  const pending = pairing
+  if (!pending) throw new Error(t('Párovací kód už nie je platný. Vytvor nový.'))
+  await request('/mobile/codes/email', { method: 'POST', data: { code: pending.code, email } })
+  if (pairing === pending) feedback('pair-email-feedback', t('Párovací e-mail bol odoslaný.'))
 })
 
 $('#copy-pair').addEventListener('click', action($('#copy-pair'), 'pair-feedback', async () => {

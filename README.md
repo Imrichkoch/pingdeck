@@ -80,7 +80,11 @@ Android 8+ má natívneho klienta v priečinku android. Na zostavenie vo Windows
 
 APK vznikne v work/android-build/pingdeck.apk. Rovnaký podpisovací kľúč v work/signing je potrebný pri ďalších vydaniach. Kľúč a heslo do verejného archívu nepatria. Kópiu APK umiestni v Compose do downloads/pingdeck.apk, potom reštartuj aplikáciu. Pre nasadenie bez Compose môžeš nastaviť ANDROID_APK na cestu k súboru.
 
-V paneli v sekcii Zariadenia vytvor jednorazový párovací kód pre Android. Prijímací kľúč povoľuje čítanie a potvrdenie správ iba pre spárovaný telefón. Android čaká na správy cez HTTPS pomocou služby s trvalým oznámením. Pozastavené správy ostanú vo fronte do nastavenej platnosti, najviac 100 na zariadenie. TTL 0 vyžaduje aktívne čakanie telefónu. Po reštarte telefónu môžeš príjem znova zapnúť v aplikácii. Na iPhone a iPade je klient dostupný ako webová aplikácia so schránkou správ na /iphone-app. Otvor ju v Safari a pridaj na plochu. Schránka uchováva posledných 100 doručených správ lokálne v prehliadači.
+V paneli v sekcii Zariadenia vytvor jednorazový párovací kód pre Android. Používateľ môže kód naskenovať priamo v aplikácii, otvoriť párovací HTTPS odkaz na telefóne alebo zadať kód ručne. Odkaz a QR obsahujú jednorazový kód vo fragmente URL a platia najviac 10 minút od vytvorenia. Telefón zobrazí adresu servera a vyžiada potvrdenie.
+
+Odoslanie pozvánky e-mailom zapneš cez PAIR_SMTP_HOST, PAIR_SMTP_PORT (predvolene 465 s implicitným TLS), PAIR_SMTP_ADDRESS a PAIR_SMTP_PASSWORD. Použi oddelenú odosielaciu schránku. Priamy App Link pre raizenko.cloud je viazaný na podpis distribučného APK a cestu /pingdeck/android/pair. Pri zostavení pre iný host uprav AndroidManifest.xml, vygeneruj vlastný podpis a publikuj jeho SHA-256 odtlačok na /.well-known/assetlinks.json podľa príkladu v deploy. Skener a ručné párovanie fungujú aj s iným HTTPS serverom.
+
+Prijímací kľúč povoľuje čítanie a potvrdenie správ iba pre spárovaný telefón. Android čaká na správy cez HTTPS pomocou služby s trvalým oznámením. Pozastavené správy ostanú vo fronte do nastavenej platnosti, najviac 100 na zariadenie. TTL 0 vyžaduje aktívne čakanie telefónu. Po reštarte telefónu môžeš príjem znova zapnúť v aplikácii. Na iPhone a iPade je klient dostupný ako webová aplikácia so schránkou správ na /iphone-app. Otvor ju v Safari a pridaj na plochu. Schránka uchováva posledných 100 doručených správ lokálne v prehliadači.
 
 ## E-mailový príjem
 

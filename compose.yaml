@@ -21,6 +21,10 @@ services:
       MAIL_IMAP_PASSWORD: ${MAIL_IMAP_PASSWORD:-}
       MAIL_IMAP_PORT: ${MAIL_IMAP_PORT:-993}
       MAIL_POLL_SECONDS: ${MAIL_POLL_SECONDS:-15}
+      PAIR_SMTP_HOST: ${PAIR_SMTP_HOST:-}
+      PAIR_SMTP_PORT: ${PAIR_SMTP_PORT:-465}
+      PAIR_SMTP_ADDRESS: ${PAIR_SMTP_ADDRESS:-}
+      PAIR_SMTP_PASSWORD: ${PAIR_SMTP_PASSWORD:-}
     volumes:
       - data:/data
       - ./downloads:/downloads:ro

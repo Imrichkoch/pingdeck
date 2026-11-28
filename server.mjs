@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.mjs'
 import { acceptLanguage, translate } from './public/locale.js'
+import { emailPairing, pairingImage, pairingLink } from './pairing-mail.mjs'
 import * as store from './store.mjs'
 import * as mobile from './mobile-store.mjs'
 import { startMailGateway, stopMailGateway } from './mail.mjs'
@@ -23,7 +24,7 @@ app.disable('x-powered-by')
 if (config.trustProxy) app.set('trust proxy', 1)
 app.use((req, res, next) => {
   res.set({
-    'Content-Security-Policy': "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; worker-src 'self'",
+    'Content-Security-Policy': "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; worker-src 'self'; img-src 'self' data:",
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',
     'X-Frame-Options': 'DENY',
@@ -118,6 +119,7 @@ if (src) {
   pages.get('/source.zip', (req, res) => res.download(config.sourceArchive, 'pingdeck-source.zip'))
 }
 pages.get('/iphone', (req, res) => page('iphone.html', res))
+pages.get('/android/pair', (req, res) => page('android-pair.html', res))
 if (apk) {
   pages.get('/android', (req, res) => page('android.html', res))
   pages.get('/pingdeck.apk', (req, res) => res.download(config.androidApk, 'pingdeck.apk', {
@@ -222,6 +224,7 @@ api.get('/overview', requireOwner, (req, res) => res.json({
   devices: [...store.devices(), ...mobile.mobileDevices()].sort((a, b) => b.created - a.created),
   emailAddress: config.mail?.address ?? '',
   androidAvailable: Boolean(apk),
+  pairingEmailAvailable: Boolean(config.pairMail),
   keys: store.apiKeys(),
   history: store.recentHistory(),
   vapidPublicKey
@@ -261,11 +264,34 @@ api.delete('/keys/:id', sameOrigin, requireOwner, (req, res) => {
   res.status(204).end()
 })
 
-api.post('/mobile/codes', sameOrigin, requireOwner, (req, res) => {
+api.post('/mobile/codes', sameOrigin, requireOwner, async (req, res) => {
   const data = body(req)
   const result = mobile.createPairCode(text(data.name, 'názov', 48, true), text(data.group, 'skupina', 48))
   if (!result) throw new InputError('Je vytvorených príliš veľa platných kódov.', 429)
-  res.status(201).json(result)
+  const png = await pairingImage(result.code)
+  res.status(201).json({ ...result, link: pairingLink(result.code), qr: 'data:image/png;base64,' + png.toString('base64') })
+})
+
+api.post('/mobile/codes/email', sameOrigin, requireOwner, async (req, res) => {
+  if (!config.pairMail) throw new InputError('Odosielanie párovacích e-mailov nie je nastavené.', 503)
+  const { code, email } = body(req)
+  const recipient = typeof email === 'string' ? email.trim() : ''
+  if (recipient.length > 254 || !/^[a-z\d._%+-]+@[a-z\d]+(?:[.-][a-z\d]+)*\.[a-z]{2,63}$/i.test(recipient) ||
+      recipient.toLowerCase() === config.mail?.address.toLowerCase()) {
+    throw new InputError('Zadaj platnú e-mailovú adresu príjemcu.')
+  }
+  if (typeof code !== 'string' || !/^[\w-]{22}$/.test(code) || mobile.pairStatus(code).state !== 'waiting') {
+    throw new InputError('Párovací kód už nie je platný. Vytvor nový.', 409)
+  }
+  throttle('pair-email', 5)
+  throttle('pair-email:' + store.hash(code), 3, 10 * minute)
+  try {
+    await emailPairing({ to: recipient, code, language: languageFor(req) })
+  } catch (error) {
+    console.warn('Pairing email failed:', error.code ?? error.name)
+    throw new InputError('Párovací e-mail sa nepodarilo odoslať. Skús znova.', 502)
+  }
+  res.status(204).end()
 })
 
 api.post('/mobile/codes/status', sameOrigin, requireOwner, (req, res) => {

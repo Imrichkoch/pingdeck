@@ -200,6 +200,11 @@ dialog h2 { margin-bottom: 16px; }
 .mobile-promo h2 { margin-top: 7px; font-size: clamp(2rem, 4.4vw, 3.5rem); }
 .mobile-actions { margin-top: 15px; }
 .new-key > button { margin-top: 9px; }
+.pair-qr { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-bottom: 12px; }
+.pair-qr img { display: block; width: 176px; height: 176px; border-radius: 7px; background: #fff; }
+.pair-qr > div { flex: 1 1 155px; }
+.pair-qr .button { margin-top: 8px; }
+#pair-email-form { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--line); }
 .install-shell { max-width: 760px; padding-block: 56px; }
 .install-shell h1 { margin-block: 10px; font-size: clamp(2.6rem, 7vw, 4.9rem); }
 .install-shell > p:not(.eyebrow) { font-size: 1.16rem; color: var(--muted); }

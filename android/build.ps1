@@ -30,6 +30,16 @@ function Invoke-Native([string]$Path, [string[]]$Arguments) {
     if ($LASTEXITCODE -ne 0) { throw "$Path failed with exit code $LASTEXITCODE" }
 }
 
+$dependencies = Join-Path $root 'work/toolchain'
+New-Item -ItemType Directory -Path $dependencies -Force | Out-Null
+$qrCore = Join-Path $dependencies 'zxing-core-3.5.4.jar'
+if (!(Test-Path -LiteralPath $qrCore)) {
+    Invoke-WebRequest -Uri 'https://repo.maven.apache.org/maven2/com/google/zxing/core/3.5.4/core-3.5.4.jar' -OutFile $qrCore
+}
+if ((Get-FileHash -LiteralPath $qrCore -Algorithm SHA256).Hash -ne '71DE5D89341B5FCF5DD89DA7F44E84D825D0E084CDF3EC77C9ABE26B0F0CEB13') {
+    throw 'ZXing dependency checksum mismatch.'
+}
+
 $resources = Join-Path $OutputDirectory 'resources.zip'
 $unsigned = Join-Path $OutputDirectory 'unsigned.apk'
 $aligned = Join-Path $OutputDirectory 'aligned.apk'
@@ -38,12 +48,12 @@ $apk = Join-Path $OutputDirectory 'pingdeck.apk'
 
 Invoke-Native "$tools/aapt2.exe" @('compile','--dir',"$PSScriptRoot/res",'-o',$resources)
 Invoke-Native "$tools/aapt2.exe" @('link','-I',$platform,'--manifest',"$PSScriptRoot/AndroidManifest.xml",
-    '--java',$artifacts.generated,'-o',$unsigned,$resources)
+    '--java',$artifacts.generated,'-A',"$PSScriptRoot/assets",'-o',$unsigned,$resources)
 $sources = Get-ChildItem -Path "$PSScriptRoot/src",$artifacts.generated -Recurse -Filter '*.java' -File
 Invoke-Native "$JdkHome/bin/javac.exe" (@('-encoding','UTF-8','-source','8','-target','8',
-    '-classpath',$platform,'-d',$artifacts.classes) + @($sources.FullName))
+    '-classpath',($platform + [IO.Path]::PathSeparator + $qrCore),'-d',$artifacts.classes) + @($sources.FullName))
 Invoke-Native "$JdkHome/bin/jar.exe" @('cf',$bytecode,'-C',$artifacts.classes,'.')
-Invoke-Native "$tools/d8.bat" @('--release','--min-api','26','--lib',$platform,'--output',$artifacts.dex,$bytecode)
+Invoke-Native "$tools/d8.bat" @('--release','--min-api','26','--lib',$platform,'--output',$artifacts.dex,$bytecode,$qrCore)
 Invoke-Native "$JdkHome/bin/jar.exe" @('uf',$unsigned,'-C',$artifacts.dex,'classes.dex')
 Invoke-Native "$tools/zipalign.exe" @('-f','4',$unsigned,$aligned)
 

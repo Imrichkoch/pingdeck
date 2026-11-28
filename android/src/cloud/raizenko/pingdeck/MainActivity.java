@@ -39,6 +39,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     private static final int ACCENT = Color.rgb(255, 117, 76);
     private static final int ERROR = Color.rgb(160, 40, 22);
     private static final int PERMISSION = 10;
+    private static final int SCAN_QR = 11;
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private State state;
@@ -46,6 +47,9 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     private LinearLayout messages;
     private TextView status;
     private Button toggle;
+    private EditText pairingServer;
+    private EditText pairingCode;
+    private Button pairingButton;
     private boolean showingInbox;
 
     @Override public void onCreate(Bundle saved) {
@@ -53,6 +57,47 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         state = new State(this);
         state.prefs.registerOnSharedPreferenceChangeListener(this);
         render();
+        if (saved == null) handlePairingIntent(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handlePairingIntent(intent);
+    }
+
+    private void handlePairingIntent(Intent intent) {
+        if (Intent.ACTION_VIEW.equals(intent.getAction())) confirmPairingLink(intent.getDataString());
+    }
+
+    @Override protected void onActivityResult(int request, int result, Intent data) {
+        super.onActivityResult(request, result, data);
+        if (request == SCAN_QR && result == RESULT_OK && data != null) {
+            confirmPairingLink(data.getStringExtra("link"));
+        }
+    }
+
+    private void confirmPairingLink(String rawLink) {
+        PairingLink link = PairingLink.parse(rawLink);
+        if (link == null || state.paired()) {
+            new AlertDialog.Builder(this)
+                    .setMessage(link == null ? R.string.invalid_pairing_link : R.string.pair_already_connected)
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+        if (pairingButton == null || !pairingButton.isEnabled()) return;
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.confirm_pairing)
+                .setMessage(getString(R.string.confirm_pairing_server, link.server))
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.pair_phone, (dialog, which) -> {
+                    if (state.paired() || !pairingButton.isEnabled()) return;
+                    pairingServer.setText(link.server);
+                    pairingCode.setText(link.code);
+                    pairingButton.performClick();
+                })
+                .show();
     }
 
     @Override protected void onResume() {
@@ -106,6 +151,11 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         String description = state.statusReason() == State.Status.REVOKED ? state.status() :
                 getString(R.string.pair_instructions);
         add(content, text(description, 16, MUTED, false), 8);
+        if (getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)) {
+            Button scan = button(getString(R.string.scan_qr), true);
+            add(content, scan, 16);
+            scan.setOnClickListener(view -> startActivityForResult(new Intent(this, QrActivity.class), SCAN_QR));
+        }
         LinearLayout card = card();
         add(content, card, 21);
         add(card, text(getString(R.string.server_address), 14, INK, true), 0);
@@ -117,7 +167,10 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         add(card, code, 6);
 
         TextView feedback = text("", 14, ERROR, false);
-        Button pair = button(getString(R.string.pair_phone), true);
+        Button pair = button(getString(R.string.pair_phone), false);
+        pairingServer = server;
+        pairingCode = code;
+        pairingButton = pair;
         add(card, pair, 16);
         add(card, feedback, 9);
         pair.setOnClickListener(view -> {

@@ -1,6 +1,6 @@
 <resources>
   <string name="connect_phone">Connect your phone</string>
-  <string name="pair_instructions">Open Devices in the dashboard, create an Android pairing code and paste it here.</string>
+  <string name="pair_instructions">Generate a code in Devices. Scan the QR code or paste the pairing code below.</string>
   <string name="server_address">HTTPS server address</string>
   <string name="pair_code">One-time pairing code</string>
   <string name="code_hint">Code from dashboard</string>
@@ -44,4 +44,12 @@
   <string name="state_reconnecting">The server is unavailable. Reconnecting…</string>
   <string name="change_language">App language</string>
   <string name="language_code">en</string>
+  <string name="scan_qr">Scan QR code</string>
+  <string name="scan_instruction">Point the camera at the PingDeck pairing QR code.</string>
+  <string name="scan_permission_denied">Camera permission is off. Go back to enter the code manually or allow camera access in Settings.</string>
+  <string name="scan_unavailable">The camera could not start. Go back and enter the code manually.</string>
+  <string name="invalid_pairing_link">This is not a PingDeck pairing link.</string>
+  <string name="pair_already_connected">Disconnect this phone before pairing it with another server.</string>
+  <string name="confirm_pairing">Confirm pairing</string>
+  <string name="confirm_pairing_server">Pair this phone with server %1$s?</string>
 </resources>

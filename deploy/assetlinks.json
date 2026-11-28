@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "cloud.raizenko.pingdeck",
+      "sha256_cert_fingerprints": [
+        "8B:C2:C2:04:8C:50:57:D9:57:FF:CA:FB:B9:4D:68:AA:B4:22:BA:67:AA:E6:FB:1C:44:1E:EA:CB:07:B1:F2:B3"
+      ]
+    }
+  }
+]

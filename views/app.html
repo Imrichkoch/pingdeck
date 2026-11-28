@@ -110,8 +110,20 @@
               <p class="feedback" id="pair-feedback" role="status"></p>
             </form>
             <div id="pair-result" class="new-key" hidden>
+              <div class="pair-qr">
+                <img id="pair-qr-image" width="176" height="176" alt="{{t:Párovací QR kód PingDecku}}">
+                <div>
+                  <p>{{t:V aplikácii PingDeck otvor skener a naskenuj tento QR kód.}}</p>
+                  <a id="pair-open" class="button button-small button-outline">{{t:Otvoriť v PingDecku}}</a>
+                </div>
+              </div>
               <label>{{t:Párovací kód}} <input id="pair-code" readonly spellcheck="false"></label>
               <button class="button button-small button-outline" id="copy-pair" type="button">{{t:Kopírovať kód}}</button>
+              <form id="pair-email-form" hidden>
+                <label>{{t:E-mail príjemcu}} <input type="email" name="email" maxlength="254" autocomplete="email" spellcheck="false" required></label>
+                <button class="button button-outline" type="submit">{{t:Poslať QR kód e-mailom}}</button>
+                <p class="feedback" id="pair-email-feedback" role="status"></p>
+              </form>
             </div>
             <div class="actions mobile-actions">{{androidLink}}</div>
           </article>

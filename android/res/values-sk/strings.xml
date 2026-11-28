@@ -1,6 +1,6 @@
 <resources>
   <string name="connect_phone">Pripoj telefón</string>
-  <string name="pair_instructions">V paneli otvor Zariadenia, vytvor Android kód a vlož ho sem.</string>
+  <string name="pair_instructions">V časti Zariadenia vytvor kód. Naskenuj QR kód alebo ho zadaj nižšie.</string>
   <string name="server_address">HTTPS adresa servera</string>
   <string name="pair_code">Jednorazový párovací kód</string>
   <string name="code_hint">Kód z panela</string>
@@ -44,4 +44,12 @@
   <string name="state_reconnecting">Server je nedostupný. Skúšam obnoviť pripojenie.</string>
   <string name="change_language">Jazyk aplikácie</string>
   <string name="language_code">sk</string>
+  <string name="scan_qr">Naskenovať QR kód</string>
+  <string name="scan_instruction">Namier fotoaparát na párovací QR kód PingDecku.</string>
+  <string name="scan_permission_denied">Fotoaparát nie je povolený. Vráť sa a zadaj kód ručne alebo povoľ fotoaparát v nastaveniach.</string>
+  <string name="scan_unavailable">Fotoaparát sa nepodarilo spustiť. Vráť sa a zadaj kód ručne.</string>
+  <string name="invalid_pairing_link">Tento kód nepatrí k párovacím odkazom PingDecku.</string>
+  <string name="pair_already_connected">Pred spárovaním s ďalším serverom odpoj tento telefón.</string>
+  <string name="confirm_pairing">Potvrď párovanie</string>
+  <string name="confirm_pairing_server">Spárovať tento telefón so serverom %1$s?</string>
 </resources>
