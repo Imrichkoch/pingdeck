@@ -40,16 +40,16 @@ public final class ReceiverService extends Service {
         super.onCreate();
         state = new State(this);
         manager = getSystemService(NotificationManager.class);
-        manager.createNotificationChannel(new NotificationChannel(SERVICE_CHANNEL, "Pripojenie k serveru", NotificationManager.IMPORTANCE_LOW));
-        manager.createNotificationChannel(new NotificationChannel(NORMAL_CHANNEL, "Upozornenia", NotificationManager.IMPORTANCE_DEFAULT));
-        manager.createNotificationChannel(new NotificationChannel(URGENT_CHANNEL, "Dôležité upozornenia", NotificationManager.IMPORTANCE_HIGH));
-        manager.createNotificationChannel(new NotificationChannel(QUIET_CHANNEL, "Tiché upozornenia", NotificationManager.IMPORTANCE_LOW));
+        manager.createNotificationChannel(new NotificationChannel(SERVICE_CHANNEL, getString(R.string.channel_connection), NotificationManager.IMPORTANCE_LOW));
+        manager.createNotificationChannel(new NotificationChannel(NORMAL_CHANNEL, getString(R.string.channel_normal), NotificationManager.IMPORTANCE_DEFAULT));
+        manager.createNotificationChannel(new NotificationChannel(URGENT_CHANNEL, getString(R.string.channel_urgent), NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel(QUIET_CHANNEL, getString(R.string.channel_quiet), NotificationManager.IMPORTANCE_LOW));
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && PAUSE.equals(intent.getAction())) {
             state.setActive(false);
-            state.setStatus("Príjem je pozastavený.");
+            state.setStatus(State.Status.PAUSED);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -79,11 +79,11 @@ public final class ReceiverService extends Service {
         return new Notification.Builder(this, SERVICE_CHANNEL)
                 .setSmallIcon(R.drawable.ic_alert)
                 .setContentTitle("PingDeck")
-                .setContentText("Príjem upozornení je zapnutý.")
+                .setContentText(getString(R.string.foreground_ready))
                 .setContentIntent(openApp())
                 .setOnlyAlertOnce(true)
                 .setOngoing(true)
-                .addAction(new Notification.Action.Builder(null, "Pozastaviť", action).build())
+                .addAction(new Notification.Action.Builder(null, getString(R.string.pause), action).build())
                 .build();
     }
 
@@ -97,30 +97,30 @@ public final class ReceiverService extends Service {
         Api api;
         try {
             token = state.token();
-            api = new Api(state.base());
+            api = new Api(this, state.base());
             if (token == null) {
                 stopSelf();
                 return;
             }
         } catch (Exception error) {
             state.setActive(false);
-            state.setStatus("Párovací kľúč je nedostupný. Odpoj telefón a spáruj ho znova.");
+            state.setStatus(State.Status.KEY_MISSING);
             stopSelf();
             return;
         }
 
         int delay = 2_000;
-        state.setStatus("Pripájam sa k serveru…");
+        state.setStatus(State.Status.CONNECTING);
         while (running && state.active() && state.paired()) {
             if (!hasPermission(this)) {
                 state.setActive(false);
-                state.setStatus("Upozornenia sú vypnuté v nastaveniach telefónu.");
+                state.setStatus(State.Status.NOTIFICATIONS_DISABLED);
                 break;
             }
             try {
                 JSONArray messages = api.call("GET", "messages", token, null).getJSONArray("messages");
                 if (!running || !state.active() || !token.equals(state.token())) break;
-                state.setStatus("Príjem je zapnutý. Server je dostupný.");
+                state.setStatus(State.Status.READY);
                 JSONArray ids = new JSONArray();
                 for (int index = 0; index < messages.length(); index++) {
                     if (!running || !state.active() || !hasPermission(this)) break;
@@ -141,13 +141,13 @@ public final class ReceiverService extends Service {
                 if (!running || !state.active()) break;
                 if (error.status == 401) {
                     state.unpair();
-                    state.setStatus("Odber bol zrušený. Zadaj nový párovací kód.");
+                    state.setStatus(State.Status.REVOKED);
                     break;
                 }
             } catch (Exception error) {
                 if (!running || !state.active()) break;
             }
-            state.setStatus("Server je nedostupný. Skúšam obnoviť pripojenie.");
+            state.setStatus(State.Status.RECONNECTING);
             try { Thread.sleep(delay); }
             catch (InterruptedException error) { break; }
             delay = Math.min(delay * 2, 30_000);

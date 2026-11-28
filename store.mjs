@@ -31,6 +31,9 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS mobile_pair_codes (
     hash TEXT PRIMARY KEY, name TEXT NOT NULL, device_group TEXT NOT NULL, expires INTEGER NOT NULL
   ) STRICT;
+  CREATE TABLE IF NOT EXISTS mobile_pair_receipts (
+    hash TEXT PRIMARY KEY, device_id TEXT NOT NULL, expires INTEGER NOT NULL
+  ) STRICT;
   CREATE TABLE IF NOT EXISTS mobile_devices (
     id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
     device_group TEXT NOT NULL, created INTEGER NOT NULL

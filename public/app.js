@@ -1,21 +1,28 @@
+import { translate } from './locale.js'
+
+const language = document.documentElement.lang
+const t = (source, values) => translate(language, source, values)
 const $ = selector => document.querySelector(selector)
 const { base, name: brand, defaultTitle } = document.body.dataset
 const link = path => base + path
-const date = new Intl.DateTimeFormat('sk-SK', { dateStyle: 'medium', timeStyle: 'short' })
+const allDevicesStoredValue = 'Všetky zariadenia'
+const date = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
 const state = { needsSetup: false, devices: [], keys: [], history: [], vapidPublicKey: '', emailAddress: '' }
 const views = [...document.querySelectorAll('[data-view]')]
 let reloadVersion = 0
+let testDeviceId = ''
+let pairing
 
 async function request(path, { method = 'GET', data } = {}) {
   const response = await fetch(link('/api' + path), {
     method,
-    headers: data ? { 'Content-Type': 'application/json' } : {},
+    headers: { 'Accept-Language': language, ...(data ? { 'Content-Type': 'application/json' } : {}) },
     body: data ? JSON.stringify(data) : undefined
   })
   if (response.status === 204) return
   const result = await response.json().catch(() => null)
   if (!response.ok && !(response.status === 502 && result?.deliveries)) {
-    const error = new Error(result?.error ?? 'Server neodpovedal podľa očakávania.')
+    const error = new Error(result?.error ?? t('Server neodpovedal podľa očakávania.'))
     error.status = response.status
     throw error
   }
@@ -38,7 +45,7 @@ function action(button, output, run, checkSession = true) {
     } catch (error) {
       if (checkSession && error.status === 401) {
         showEntrance(false)
-        feedback('auth-feedback', 'Prihlásenie vypršalo. Prihlás sa znova.', true)
+        feedback('auth-feedback', t('Prihlásenie vypršalo. Prihlás sa znova.'), true)
       } else {
         feedback(output, error.message, true)
       }
@@ -65,6 +72,8 @@ function showEntrance(needsSetup) {
   $('#pair-code').value = ''
   $('#pair-result').hidden = true
   $('#pair-form').reset()
+  pairing = undefined
+  choosePlatform('')
   render()
   $('#send-form').reset()
   $('#device-form').reset()
@@ -80,11 +89,11 @@ function showEntrance(needsSetup) {
   $('#setup-code').required = needsSetup
   $('#password').autocomplete = needsSetup ? 'new-password' : 'current-password'
   $('#password').minLength = needsSetup ? 12 : 0
-  $('#auth-title').textContent = needsSetup ? 'Nastav si prístup' : 'Prihlásenie'
+  $('#auth-title').textContent = needsSetup ? t('Nastav si prístup') : t('Prihlásenie')
   $('#auth-note').textContent = needsSetup
-    ? 'Zadaj jednorazový inštalačný kód a zvoľ si heslo s aspoň 12 znakmi.'
-    : 'Prihlás sa heslom správcu tejto inštancie.'
-  $('#auth-submit').textContent = needsSetup ? 'Vytvoriť prístup ↗' : 'Prihlásiť sa ↗'
+    ? t('Zadaj jednorazový inštalačný kód a zvoľ si heslo s aspoň 12 znakmi.')
+    : t('Prihlás sa heslom správcu tejto inštancie.')
+  $('#auth-submit').textContent = needsSetup ? t('Vytvoriť prístup ↗') : t('Prihlásiť sa ↗')
 }
 
 function showWorkspace() {
@@ -93,6 +102,7 @@ function showWorkspace() {
   $('#logout').hidden = false
   navigate()
   void prepareBrowserPush()
+  if (location.hash === '#zariadenia') suggestPlatform()
 }
 
 function navigate() {
@@ -139,11 +149,11 @@ function recordAction(label, output, run) {
 }
 
 const statuses = {
-  pending: 'Odosiela sa',
-  accepted: 'Prijaté',
-  partial: 'Čiastočne prijaté',
-  failed: 'Zlyhalo',
-  interrupted: 'Prerušené'
+  pending: t('Odosiela sa'),
+  accepted: t('Prijaté'),
+  partial: t('Čiastočne prijaté'),
+  failed: t('Zlyhalo'),
+  interrupted: t('Prerušené')
 }
 function formatDate(value) { return date.format(new Date(value)) }
 
@@ -151,57 +161,61 @@ function render() {
   $('#mail-panel').hidden = !state.emailAddress
   $('#mail-address').value = state.emailAddress
   const groups = [...new Set(state.devices.map(device => device.group).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b, 'sk'))
+    .sort((a, b) => a.localeCompare(b, language))
   $('#device-count').textContent = state.devices.length
   const select = $('#targets')
   const previous = select.value
-  select.replaceChildren(new Option('Všetky zariadenia', 'all'))
+  select.replaceChildren(new Option(t('Vyber príjemcu'), ''))
   for (const device of state.devices) {
-    select.add(new Option('Zariadenie · ' + device.name, 'device:' + device.id))
+    select.add(new Option(t('Zariadenie · {name}', { name: device.name }), 'device:' + device.id))
   }
-  for (const group of groups) select.add(new Option('Skupina · ' + group, 'group:' + group))
+  for (const group of groups) select.add(new Option(t('Skupina · {name}', { name: group }), 'group:' + group))
+  if (state.devices.length) select.add(new Option(t('Všetky zariadenia'), 'all'))
   if ([...select.options].some(option => option.value === previous)) select.value = previous
   $('#group-options').replaceChildren(...groups.map(group => new Option(group, group)))
 
   $('#device-list').replaceChildren(...state.devices.map(device => {
-    const [row, description] = record(device.name, (device.platform === 'android' ? 'Android · ' : 'Web Push · ') + (device.group ? 'Skupina · ' + device.group : 'Bez skupiny'))
+    const [row, description] = record(device.name, (device.platform === 'android' ? 'Android · ' : 'Web Push · ') + (device.group ? t('Skupina · {name}', { name: device.group }) : 'Bez skupiny'))
     const id = element('small', '', 'ID: ' + device.id)
     description.append(id)
     const actions = element('div', 'record-actions')
     actions.append(
-      recordAction('Upraviť', 'device-feedback', () => editDevice(device)),
-      recordAction('Odpojiť', 'device-feedback', () => removeDevice(device))
+      recordAction(t('Poslať test ↗'), 'device-list-feedback', () => sendTest(device.id, 'device-list-feedback')),
+      recordAction(t('Upraviť'), 'device-feedback', () => editDevice(device)),
+      recordAction(t('Odpojiť'), 'device-feedback', () => removeDevice(device))
     )
     row.append(actions)
     return row
   }))
 
+  showTestDevice(testDeviceId)
+
   $('#history-list').replaceChildren(...state.history.map(item => {
     const [row, description] = record(item.title)
     description.append(element('p', 'history-message', item.message),
-      element('small', '', [formatDate(item.created), item.target,
-        'Prijaté ' + item.accepted + ' · Zlyhané ' + item.failed].join(' · ')))
+      element('small', '', [formatDate(item.created), item.target === allDevicesStoredValue ? t('Všetky zariadenia') : item.target,
+        t('Prijaté {count}', { count: item.accepted }) + ' · Zlyhané ' + item.failed].join(' · ')))
     row.append(element('span', 'badge ' + item.status, statuses[item.status]))
     return row
   }))
 
   $('#key-list').replaceChildren(...state.keys.map(key => {
     const [row] = record(key.label, key.hint + '… · ' + (key.used
-      ? 'Použitý ' + formatDate(key.used) : 'Vytvorený ' + formatDate(key.created)))
-    row.append(recordAction('Zrušiť', 'key-feedback', async () => {
-      if (!confirm('Zrušiť API kľúč „' + key.label + '“?')) return
+      ? t('Použitý {date}', { date: formatDate(key.used) }) : t('Vytvorený {date}', { date: formatDate(key.created) })))
+    row.append(recordAction(t('Zrušiť'), 'key-feedback', async () => {
+      if (!confirm(t('Zrušiť API kľúč „{name}“?', { name: key.label }))) return
       await request('/keys/' + key.id, { method: 'DELETE' })
       clearSecret()
       await reload()
-      feedback('key-feedback', 'API kľúč bol zrušený.')
+      feedback('key-feedback', t('API kľúč bol zrušený.'))
     }))
     return row
   }))
 
   for (const [id, message] of Object.entries({
-    'device-list': 'Zatiaľ tu nie sú žiadne zariadenia.',
-    'history-list': 'Zatiaľ tu nie sú žiadne odoslania.',
-    'key-list': 'Zatiaľ tu nie sú žiadne API kľúče.'
+    'device-list': t('Zatiaľ tu nie sú žiadne zariadenia.'),
+    'history-list': t('Zatiaľ tu nie sú žiadne odoslania.'),
+    'key-list': t('Zatiaľ tu nie sú žiadne API kľúče.')
   })) {
     const list = $('#' + id)
     if (!list.childElementCount) list.append(element('p', 'muted', message))
@@ -216,7 +230,7 @@ function clearSecret() {
 function updatePreview() {
   const { title, message } = $('#send-form').elements
   $('#preview-title').textContent = title.value.trim() || defaultTitle
-  $('#preview-message').textContent = message.value.trim() || 'Tu sa zobrazí text správy.'
+  $('#preview-message').textContent = message.value.trim() || t('Tu sa zobrazí text správy.')
 }
 
 function decodeKey(value) {
@@ -263,24 +277,29 @@ async function prepareBrowserPush() {
 
 async function registerDevice(data) {
   if (!browserPush) {
-    throw new Error(browserPushError?.message ?? 'Web Push tu nie je dostupný. Na iPhone alebo iPade otvor panel z plochy.')
+    throw new Error(browserPushError?.message ?? t('Web Push tu nie je dostupný. Na iPhone alebo iPade otvor panel z plochy.'))
+  }
+  if (Notification.permission === 'denied') {
+    throw new Error(t('Povoľ upozornenia v nastaveniach webu a skús znova.'))
   }
   const { registration, applicationServerKey } = browserPush
   let subscription = browserPush.subscription
   try {
     subscription ??= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
-  } catch (error) {
-    throw new Error('Prehliadač nedokázal vytvoriť odber upozornení. ' + error.message)
+  } catch {
+    throw new Error(t('Prehliadač nedokázal vytvoriť odber upozornení.'))
   }
   browserPush.subscription = subscription
   const result = await request('/devices', { method: 'POST', data: { ...data, subscription: subscription.toJSON() } })
   deviceStorage(result.id)
+  testDeviceId = result.id
+  feedback('wizard-test-feedback')
   await reload()
-  feedback('device-feedback', 'Zariadenie je pripravené prijímať upozornenia.')
+  feedback('device-feedback', t('Zariadenie je pripravené prijímať upozornenia.'))
 }
 
 async function removeDevice(device) {
-  if (!confirm('Odpojiť zariadenie „' + device.name + '“?')) return
+  if (!confirm(t('Odpojiť zariadenie „{name}“?', { name: device.name }))) return
   await request('/devices/' + device.id, { method: 'DELETE' })
   if (deviceStorage() === device.id && 'serviceWorker' in navigator) {
     try {
@@ -294,7 +313,7 @@ async function removeDevice(device) {
     if (browserPush) browserPush.subscription = null
   }
   await reload()
-  feedback('device-feedback', 'Zariadenie bolo odpojené.')
+  feedback('device-feedback', t('Zariadenie bolo odpojené.'))
 }
 
 function editDevice(device) {
@@ -307,9 +326,85 @@ function editDevice(device) {
 }
 
 async function copy(text) {
-  if (!navigator.clipboard) throw new Error('Schránka nie je dostupná. Označ a skopíruj text ručne.')
+  if (!navigator.clipboard) throw new Error(t('Schránka nie je dostupná. Označ a skopíruj text ručne.'))
   await navigator.clipboard.writeText(text)
 }
+
+
+function choosePlatform(platform) {
+  for (const button of document.querySelectorAll('#device-platform button')) {
+    button.setAttribute('aria-pressed', String(button.dataset.platform === platform))
+  }
+  $('#browser-pairing').hidden = platform !== 'web' && platform !== 'iphone'
+  $('#iphone-pairing-guide').hidden = platform !== 'iphone'
+  $('#android-pairing').hidden = platform !== 'android'
+  showTestDevice('')
+  feedback('wizard-test-feedback')
+}
+
+function suggestPlatform() {
+  const installed = navigator.standalone || matchMedia('(display-mode: standalone)').matches
+  const appleMobile = /iPhone|iPad/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  if (appleMobile && installed && !$('#device-platform [aria-pressed="true"]')) {
+    choosePlatform('iphone')
+  }
+}
+
+function showTestDevice(id) {
+  testDeviceId = id
+  const device = state.devices.find(candidate => candidate.id === id)
+  $('#device-wizard-test').hidden = !device
+  $('#test-device-name').textContent = device ? t('Poslať test do zariadenia {name}', { name: device.name }) : ''
+}
+
+async function watchPairing(pending) {
+  while (pairing === pending) {
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    if (pairing !== pending) return
+    try {
+      const status = performance.now() >= pending.deadline ? { state: 'expired' } :
+        await request('/mobile/codes/status', { method: 'POST', data: { code: pending.code } })
+      if (pairing !== pending) return
+      if (status.state === 'waiting') continue
+      pairing = undefined
+      $('#pair-code').value = ''
+      $('#pair-result').hidden = true
+      if (status.state === 'linked') {
+        if (!$('#android-pairing').hidden) testDeviceId = status.id
+        await reload()
+        feedback('pair-feedback', t('Telefón je pripojený. Teraz pošli test iba doň.'))
+      } else {
+        feedback('pair-feedback', t('Kód vypršal. Vytvor nový.'), true)
+      }
+      return
+    } catch (error) {
+      feedback('pair-feedback', error.message, true)
+      if (error.status === 401) {
+        showEntrance(false)
+        return
+      }
+    }
+  }
+}
+
+async function sendTest(id, output) {
+  const result = await request('/devices/' + encodeURIComponent(id) + '/test', { method: 'POST' })
+  const delivery = result.deliveries[0]?.result
+  const message = delivery === 'queued'
+    ? t('Test čaká na prevzatie Androidom. Skontroluj, či je príjem zapnutý.')
+    : delivery === 'accepted'
+      ? t('Test prijal poskytovateľ Web Push. Skontroluj upozornenia na zariadení.')
+      : t('Test sa nepodarilo odoslať. Skontroluj pripojenie a povolenia zariadenia.')
+  feedback(output, message, !result.accepted)
+  await reload()
+}
+
+for (const button of document.querySelectorAll('#device-platform button')) {
+  button.addEventListener('click', () => choosePlatform(button.dataset.platform))
+}
+$('#wizard-test').addEventListener('click', action($('#wizard-test'), 'wizard-test-feedback',
+  () => sendTest(testDeviceId, 'wizard-test-feedback')))
 
 onSubmit('auth-form', 'auth-feedback', async (data, form) => {
   const { code, password } = data
@@ -323,19 +418,22 @@ onSubmit('auth-form', 'auth-feedback', async (data, form) => {
 
 onSubmit('pair-form', 'pair-feedback', async (data, form) => {
   const { code } = await request('/mobile/codes', { method: 'POST', data })
+  const pending = { code, deadline: performance.now() + 10 * 60_000 }
+  pairing = pending
   $('#pair-code').value = code
   $('#pair-result').hidden = false
   form.reset()
-  feedback('pair-feedback', 'Kód platí 10 minút a dá sa použiť raz.')
+  feedback('pair-feedback', t('Kód platí 10 minút a dá sa použiť raz.'))
+  void watchPairing(pending)
 })
 
 $('#copy-pair').addEventListener('click', action($('#copy-pair'), 'pair-feedback', async () => {
   await copy($('#pair-code').value)
-  feedback('pair-feedback', 'Kód je v schránke.')
+  feedback('pair-feedback', t('Kód je v schránke.'))
 }))
 $('#copy-email').addEventListener('click', action($('#copy-email'), 'mail-feedback', async () => {
   await copy($('#mail-address').value)
-  feedback('mail-feedback', 'Adresa je v schránke.')
+  feedback('mail-feedback', t('Adresa je v schránke.'))
 }))
 
 onSubmit('device-form', 'device-feedback', registerDevice)
@@ -343,15 +441,20 @@ onSubmit('edit-form', 'edit-feedback', async ({ id, name, group }) => {
   await request('/devices/' + id, { method: 'PATCH', data: { name, group } })
   $('#edit-device').close()
   await reload()
-  feedback('device-feedback', 'Zmeny boli uložené.')
+  feedback('device-feedback', t('Zmeny boli uložené.'))
 })
 
 onSubmit('send-form', 'send-feedback', async ({ target, ttl, ...data }, form) => {
+  if (!target) throw new Error(t('Vyber príjemcu'))
+  if (target === 'all') {
+    if (!confirm(t('Odoslať upozornenie na všetky zariadenia ({count})?', { count: state.devices.length }))) return
+    data.broadcast = true
+  }
   if (target.startsWith('device:')) data.deviceId = target.slice(7)
   if (target.startsWith('group:')) data.group = target.slice(6)
   data.ttl = Number(ttl)
   const result = await request('/send', { method: 'POST', data })
-  feedback('send-feedback', 'Prijaté na doručenie: ' + result.accepted + '. Zlyhané: ' + result.failed + '.', !result.accepted)
+  feedback('send-feedback', t('Prijaté na doručenie: {accepted}. Zlyhané: {failed}.', result), !result.accepted)
   if (result.accepted && !result.failed) {
     form.reset()
     updatePreview()
@@ -374,16 +477,20 @@ $('#logout').addEventListener('click', action($('#logout'), 'workspace-feedback'
 $('#refresh').addEventListener('click', action($('#refresh'), 'workspace-feedback', reload))
 $('#copy-key').addEventListener('click', action($('#copy-key'), 'key-feedback', async () => {
   await copy($('#secret').value)
-  feedback('key-feedback', 'Kľúč je v schránke.')
+  feedback('key-feedback', t('Kľúč je v schránke.'))
 }))
 $('#copy-api').addEventListener('click', action($('#copy-api'), 'workspace-feedback', async () => {
   await copy($('#api-example').textContent)
-  feedback('workspace-feedback', 'Príklad je v schránke.')
+  feedback('workspace-feedback', t('Príklad je v schránke.'))
 }))
 $('#hide-key').addEventListener('click', clearSecret)
 $('#cancel-edit').addEventListener('click', () => $('#edit-device').close())
 $('#send-form').addEventListener('input', updatePreview)
-window.addEventListener('hashchange', navigate)
+window.addEventListener('hashchange', () => {
+  if (location.hash === '#main') return
+  navigate()
+  if (location.hash === '#zariadenia') suggestPlatform()
+})
 
 try {
   const session = await request('/session')
@@ -394,6 +501,6 @@ try {
     showEntrance(session.needsSetup)
   }
 } catch (error) {
-  $('#auth-title').textContent = brand + ' je nedostupný'
+  $('#auth-title').textContent = t('{brand} je nedostupný', { brand })
   $('#auth-note').textContent = error.message
 }

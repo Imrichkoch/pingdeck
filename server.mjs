@@ -2,6 +2,7 @@ import express from 'express'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { config } from './config.mjs'
+import { acceptLanguage, translate } from './public/locale.js'
 import * as store from './store.mjs'
 import * as mobile from './mobile-store.mjs'
 import { startMailGateway, stopMailGateway } from './mail.mjs'
@@ -37,18 +38,49 @@ const html = value => value.replace(/[&<>"']/g, char => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[char])
 
+function languageFor(req) {
+  const selected = (req.get('cookie') ?? '').match(/(?:^|;\s*)pingdeck_language=(en|sk)(?:;|$)/)?.[1]
+  return selected ?? acceptLanguage(req.get('accept-language'))
+}
+
+function localizedResponse(res, language) {
+  res.set('Content-Language', language)
+  res.vary('Accept-Language').vary('Cookie')
+}
+
 function page(file, res) {
+  const req = res.req
+  const canonical = new URL(config.origin)
+  if (config.secure && req.get('host')?.toLowerCase() !== canonical.host) {
+    return res.redirect(308, canonical.origin + base + req.path + new URL(req.originalUrl, canonical).search)
+  }
+  const selected = req.query.lang
+  const language = ['sk', 'en'].includes(selected) ? selected : languageFor(req)
+  if (language === selected) {
+    res.cookie('pingdeck_language', language, { ...cookieOptions, maxAge: 365 * 86400000 })
+  }
+  localizedResponse(res, language)
+  res.set('Cache-Control', 'no-store')
+  const t = value => html(translate(language, value))
+  const languageName = t('Jazyk')
+  const languageSwitch = '<nav class="language-switch" aria-label="' + languageName + '">' +
+    ['sk', 'en'].map((value, index) => '<a data-language="' + value + '" href="?lang=' + value +
+      '" lang="' + value + '" hreflang="' + value + '"' + (language === value ? ' aria-current="true"' : '') +
+      ' aria-label="' + ['Slovenčina', 'English'][index] + '">' + value.toUpperCase() + '</a>').join('') + '</nav>'
   const template = readFileSync(views + file, 'utf8')
   const values = {
     name: html(brand.name),
-    description: html(brand.description),
+    description: t(brand.description),
+    lang: language,
+    languageSwitch,
     defaultTitle: html(brand.defaultTitle),
     base,
     endpoint: html(config.origin + base + '/api/v1/push'),
     androidLink: apk ? '<a class="button button-outline" href="' + base + '/android">Android ↓</a>' : '',
-    sourceLink: src ? `<a class="button button-outline" href="${base}/source.zip">Stiahnuť kód ↓</a>` : ''
+    sourceLink: src ? `<a class="button button-outline" href="${base}/source.zip">${t('Stiahnuť kód ↓')}</a>` : ''
   }
-  res.type('html').send(template.replace(/\{\{(\w+)\}\}/g, (_, key) => values[key]))
+  res.type('html').send(template.replace(/\{\{(\w+|t:[^{}]+)\}\}/g,
+    (_, key) => key.startsWith('t:') ? t(key.slice(2)) : values[key]))
 }
 
 pages.get('/', (req, res) => page('landing.html', res))
@@ -59,12 +91,15 @@ pages.get('/app', (req, res) => {
 pages.get('/iphone-app', (req, res) => page('iphone-app.html', res))
 pages.get(['/manifest.webmanifest', '/iphone.webmanifest'], (req, res) => {
   const iphone = req.path === '/iphone.webmanifest'
+  const language = languageFor(req)
+  localizedResponse(res, language)
+  res.set('Cache-Control', 'private, no-cache')
   res.type('application/manifest+json').send({
     id: base + (iphone ? '/iphone-app' : '/'),
     name: brand.name,
     short_name: brand.name,
-    description: brand.description,
-    lang: 'sk',
+    description: translate(language, brand.description),
+    lang: language,
     start_url: base + (iphone ? '/iphone-app' : '/app'),
     scope: base + '/',
     display: 'standalone',
@@ -233,6 +268,14 @@ api.post('/mobile/codes', sameOrigin, requireOwner, (req, res) => {
   res.status(201).json(result)
 })
 
+api.post('/mobile/codes/status', sameOrigin, requireOwner, (req, res) => {
+  const { code } = body(req)
+  if (typeof code !== 'string' || !/^[\w-]{22}$/.test(code)) {
+    throw new InputError('Neplatný alebo použitý párovací kód.')
+  }
+  res.json(mobile.pairStatus(code))
+})
+
 api.post('/mobile/pair', (req, res) => {
   const { code } = body(req)
   throttle('pair:' + req.ip, 30)
@@ -296,7 +339,26 @@ async function dispatch(req, res) {
   res.status(result.accepted ? 202 : 502).json(result)
 }
 
-api.post('/send', sameOrigin, requireOwner, dispatch)
+api.post('/devices/:id/test', sameOrigin, requireOwner, async (req, res) => {
+  const language = languageFor(req)
+  const result = await limitedSend({
+    deviceId: req.params.id,
+    title: translate(language, 'Testovacia správa z PingDecku'),
+    message: translate(language, 'Ak vidíš túto správu, upozornenia fungujú.'),
+    ttl: 300
+  })
+  res.status(result.accepted ? 202 : 502).json(result)
+})
+
+api.post('/send', sameOrigin, requireOwner, (req, res, next) => {
+  const { deviceId, group, broadcast } = body(req)
+  const hasTarget = (typeof deviceId === 'string' && Boolean(deviceId.trim())) ||
+    (typeof group === 'string' && Boolean(group.trim()))
+  if (hasTarget ? broadcast === true : broadcast !== true) {
+    throw new InputError('Vyber príjemcu alebo výslovne označ všetky zariadenia.')
+  }
+  next()
+}, dispatch)
 api.post('/v1/push', (req, res, next) => {
   const raw = req.get('authorization')?.match(/^Bearer (pd_[\w-]{43})$/i)?.[1]
   req.apiKeyId = raw && store.verifyApiKey(raw)
@@ -318,7 +380,9 @@ app.use((error, req, res, next) => {
       : status === 400 ? 'Neplatný JSON.' : 'Interná chyba servera.'
   if (status === 500) console.error(error)
   if (status === 429) res.set('Retry-After', req.path === '/login' || req.path === '/setup' ? '900' : '60')
-  res.status(status).json({ error: message })
+  const language = languageFor(req)
+  res.set('Content-Language', language)
+  res.status(status).json({ error: translate(language, message) })
 })
 
 store.interruptPending()

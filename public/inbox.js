@@ -1,8 +1,12 @@
+import { translate } from './locale.js'
+
+const language = document.documentElement.lang
+const t = source => translate(language, source)
 const statusLine = document.querySelector('#inbox-status')
 const list = document.querySelector('#inbox-list')
 const setup = document.querySelector('#inbox-setup')
 const basePath = document.body.dataset.base
-const formatDate = new Intl.DateTimeFormat('sk-SK', { dateStyle: 'medium', timeStyle: 'short' })
+const formatDate = new Intl.DateTimeFormat(language, { dateStyle: 'medium', timeStyle: 'short' })
 
 function text(tag, value, className) {
   const node = document.createElement(tag)
@@ -41,11 +45,11 @@ async function updateInbox() {
     const entries = await PingDeckInbox.list()
     list.replaceChildren(...entries.map(makeCard))
     setup.hidden = Boolean(subscription)
-    statusLine.textContent = entries.length ? 'Správy uložené v tomto zariadení.' : subscription
-      ? 'Keď príde upozornenie, zobrazí sa tu.'
-      : 'Pripoj zariadenie v paneli, aby mohlo prijímať upozornenia.'
+    statusLine.textContent = entries.length ? t('Správy uložené v tomto zariadení.') : subscription
+      ? t('Keď príde upozornenie, zobrazí sa tu.')
+      : t('Pripoj zariadenie v paneli, aby mohlo prijímať upozornenia.')
   } catch {
-    statusLine.textContent = 'Schránku správ sa nepodarilo načítať.'
+    statusLine.textContent = t('Schránku správ sa nepodarilo načítať.')
   }
 }
 

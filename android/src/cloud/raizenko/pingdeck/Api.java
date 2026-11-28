@@ -1,5 +1,6 @@
 package cloud.raizenko.pingdeck;
 
+import android.content.Context;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -12,8 +13,10 @@ import java.nio.charset.StandardCharsets;
 final class Api {
     static final String DEFAULT_URL = "https://raizenko.cloud/pingdeck";
     final String base;
+    private final Context context;
 
-    Api(String base) {
+    Api(Context context, String base) {
+        this.context = context;
         String value = base.trim().replaceAll("/+$", "");
         try {
             URI uri = URI.create(value).normalize();
@@ -23,7 +26,7 @@ final class Api {
             }
             this.base = uri.toASCIIString();
         } catch (IllegalArgumentException error) {
-            throw new IllegalArgumentException("Zadaj úplnú HTTPS adresu servera.");
+            throw new IllegalArgumentException(context.getString(R.string.invalid_server));
         }
     }
 
@@ -34,6 +37,7 @@ final class Api {
         connection.setReadTimeout(28_000);
         connection.setInstanceFollowRedirects(false);
         connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("Accept-Language", context.getString(R.string.language_code));
         if (token != null) connection.setRequestProperty("Authorization", "Bearer " + token);
         try {
             if (data != null) {
@@ -51,7 +55,7 @@ final class Api {
                 JSONObject result;
                 try { result = read(connection.getErrorStream()); }
                 catch (Exception error) { result = new JSONObject(); }
-                throw new Failure(status, result.optString("error", "Server odpovedal stavom " + status + "."));
+                throw new Failure(status, result.optString("error", context.getString(R.string.server_error, status)));
             }
             return read(connection.getInputStream());
         } finally {
@@ -65,7 +69,7 @@ final class Api {
             byte[] buffer = new byte[8192];
             int count;
             while ((count = stream.read(buffer)) != -1) {
-                if (bytes.size() + count > 512 * 1024) throw new IOException("Odpoveď servera je príliš veľká.");
+                if (bytes.size() + count > 512 * 1024) throw new IOException(context.getString(R.string.large_response));
                 bytes.write(buffer, 0, count);
             }
             return new JSONObject(new String(bytes.toByteArray(), StandardCharsets.UTF_8));

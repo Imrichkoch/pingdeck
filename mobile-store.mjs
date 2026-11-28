@@ -16,10 +16,24 @@ export function mobileDevices() {
 export function createPairCode(name, group) {
   const code = randomBytes(16).toString('base64url')
   const expires = Date.now() + pairAge
-  db.prepare('DELETE FROM mobile_pair_codes WHERE expires <= ?').run(Date.now())
+  const now = Date.now()
+  db.prepare('DELETE FROM mobile_pair_codes WHERE expires <= ?').run(now)
+  db.prepare('DELETE FROM mobile_pair_receipts WHERE expires <= ?').run(now)
   if (db.prepare('SELECT count(*) AS total FROM mobile_pair_codes').get().total >= 30) return null
-  db.prepare('INSERT INTO mobile_pair_codes VALUES (?, ?, ?, ?)').run(hash(code), name, group, expires)
+  db.prepare('INSERT INTO mobile_pair_codes (hash, name, device_group, expires) VALUES (?, ?, ?, ?)').run(hash(code), name, group, expires)
   return { code, expires }
+}
+
+export function pairStatus(code) {
+  const tokenHash = hash(code)
+  const now = Date.now()
+  const linked = db.prepare('SELECT device_id FROM mobile_pair_receipts WHERE hash = ? AND expires > ?')
+    .get(tokenHash, now)
+  if (linked && mobileExists(linked.device_id)) return { state: 'linked', id: linked.device_id }
+
+  const waiting = db.prepare('SELECT 1 FROM mobile_pair_codes WHERE hash = ? AND expires > ?')
+    .get(tokenHash, now)
+  return { state: waiting ? 'waiting' : 'expired' }
 }
 
 export function pairMobile(code) {
@@ -34,6 +48,7 @@ export function pairMobile(code) {
     const secret = 'pdr_' + token()
     db.prepare('INSERT INTO mobile_devices VALUES (?, ?, ?, ?, ?)')
       .run(id, hash(secret), info.name, info.device_group, Date.now())
+    db.prepare('INSERT INTO mobile_pair_receipts VALUES (?, ?, ?)').run(info.hash, id, info.expires)
     db.prepare('DELETE FROM mobile_pair_codes WHERE hash = ?').run(info.hash)
     db.exec('COMMIT')
     return { id, token: secret, name: info.name }

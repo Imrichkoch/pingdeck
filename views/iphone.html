@@ -1,29 +1,30 @@
 <!doctype html>
-<html lang="sk">
+<html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f5f2ea">
-  <title>{{name}} pre iPhone a iPad</title>
+  <title>{{name}} {{t:pre iPhone a iPad}}</title>
   <link rel="icon" href="{{base}}/icon-192.png">
   <link rel="stylesheet" href="{{base}}/site.css">
+  <script type="module" src="{{base}}/language.js"></script>
 </head>
 <body>
   <header class="site-header"><div class="shell header-inner">
     <a href="{{base}}/" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
-    <a class="button button-small button-outline header-cta" href="{{base}}/app">Otvoriť panel ↗</a>
+    <div class="header-tools">{{languageSwitch}}<a class="button button-small button-outline header-cta" href="{{base}}/app">{{t:Otvoriť panel ↗}}</a></div>
   </div></header>
   <main class="shell install-shell">
-    <p class="eyebrow"><span class="indicator"></span> IOS A IPADOS 16.4+</p>
-    <h1>{{name}} pre iPhone a iPad</h1>
-    <p>Pridaj PingDeck na plochu ako webovú aplikáciu a povoľ systémové upozornenia.</p>
-    <div class="actions"><a class="button button-primary" href="{{base}}/iphone-app">Otvoriť PingDeck v Safari ↗</a>{{androidLink}}</div>
+    <p class="eyebrow"><span class="indicator"></span> IOS / IPADOS 16.4+</p>
+    <h1>{{name}} {{t:pre iPhone a iPad}}</h1>
+    <p>{{t:Pridaj PingDeck na plochu ako webovú aplikáciu a povoľ systémové upozornenia.}}</p>
+    <div class="actions"><a class="button button-primary" href="{{base}}/iphone-app">{{t:Otvoriť PingDeck v Safari ↗}}</a>{{androidLink}}</div>
     <section class="app-card">
-      <h2>Pridanie na plochu</h2>
+      <h2>{{t:Pridanie na plochu}}</h2>
       <ol>
-        <li>Otvor schránku PingDeck v Safari a v menu <strong>Zdieľať</strong> vyber <strong>Pridať na plochu</strong>.</li>
-        <li>Spusť PingDeck z novej ikony, stlač Povoliť upozornenia a prihlás sa do panela.</li>
-        <li>V časti <strong>Zariadenia</strong> pomenuj telefón, stlač <strong>Povoliť upozornenia</strong> a potvrď výzvu iOS. Odkaz <strong>Schránka v zariadení</strong> ťa vráti k doručeným správam.</li>
+        <li>{{t:Otvor schránku PingDeck v Safari a v menu}} <strong>{{t:Zdieľať}}</strong> {{t:vyber}} <strong>{{t:Pridať na plochu}}</strong>.</li>
+        <li>{{t:Spusť PingDeck z novej ikony, stlač Povoliť upozornenia a prihlás sa do panela.}}</li>
+        <li>{{t:V časti}} <strong>{{t:Zariadenia}}</strong> {{t:pomenuj telefón, stlač}} <strong>{{t:Povoliť upozornenia}}</strong> {{t:a potvrď výzvu iOS. Odkaz}} <strong>{{t:Schránka v zariadení}}</strong> {{t:ťa vráti k doručeným správam.}}</li>
       </ol>
     </section>
   </main>

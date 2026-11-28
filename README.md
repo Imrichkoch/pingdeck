@@ -23,6 +23,12 @@ Otvor /app, zadaj kód vypísaný príkazom a vytvor heslo správcu. V časti **
 
 Ak prevádzkuješ aj iné aplikácie, ktoré upravujú tretie strany, použitie vlastnej HTTPS subdomény umožní prehliadaču izolovať prístup k panelu podľa originu. Pri zmene domény sa zariadenia prihlásia k odberu znova. Compose sprístupňuje backend iba na 127.0.0.1. Kopírovanie archívu zdrojov do downloads/pingdeck-source.zip a reštart aplikácie sprístupnia stiahnutie zdrojov na landing page.
 
+## Pripojenie zariadenia a jazyk
+
+V paneli otvor Zariadenia a vyber prehliadač, Android alebo iPhone a iPad. Po povolení upozornení alebo spárovaní Androidu môžeš poslať skúšobnú správu iba na pripojené zariadenie. Pri bežnom odosielaní z panelu vždy vyber príjemcu. Keď vyberieš všetky zariadenia, panel si vypýta potvrdenie. Existujúce integrácie cez /api/v1/push používajú rovnaké parametre ako predtým.
+
+Web vrátane schránky pre iPhone má prepínač SK / EN. Android má anglické a slovenské rozhranie podľa systému. Od Androidu 13 môžeš jazyk zmeniť aj priamo v nastaveniach aplikácie.
+
 ## Rozhranie
 
 V **Integrácie** vytvor API kľúč pre monitorovací systém alebo skript a nastav PINGDECK_KEY. Lokálny príklad pre Bash.
@@ -80,6 +86,6 @@ V paneli v sekcii Zariadenia vytvor jednorazový párovací kód pre Android. Pr
 
 Vytvor vyhradenú IMAP schránku s dlhou náhodnou lokálnou časťou. V .env nastav MAIL_IMAP_HOST, MAIL_IMAP_ADDRESS a MAIL_IMAP_PASSWORD. Brána používa IMAPS s overením certifikátu. Prihlasovacie údaje patria do súkromného prostredia servera. Prijímacia adresa je dostupná po prihlásení v sekcii Integrácie. Každý, kto ju pozná, môže poslať upozornenie, preto ju zdieľaj iba s dôveryhodnými integráciami.
 
-Predmet sa použije ako nadpis a text MIME správy ako telo. Predpona [skupina:monitoring] v predmete zacieli skupinu. Bez predpony správa smeruje na všetky zariadenia. Brána priebežne spracúva vyhradený INBOX a odstraňuje spracované správy. Správy nad 256 KiB, staršie než dva dni a automatické odpovede vynecháva. Ak ešte nemáš pripojené zariadenia, hromadnú správu spracuje po ich pripojení, najneskôr do dvoch dní.
+Predmet sa použije ako nadpis a text MIME správy ako telo. Predpona [skupina:monitoring] alebo [group:monitoring] v predmete zacieli skupinu. Bez predpony správa smeruje na všetky zariadenia. Brána priebežne spracúva vyhradený INBOX a odstraňuje spracované správy. Správy nad 256 KiB, staršie než dva dni a automatické odpovede vynecháva. Ak ešte nemáš pripojené zariadenia, hromadnú správu spracuje po ich pripojení, najneskôr do dvoch dní.
 
 PingDeck je nezávislý projekt inšpirovaný pracovným postupom Pushsafer. Bricolage Grotesque a IBM Plex Mono sú dodávané cez balíky Fontsource pod licenciou SIL OFL.

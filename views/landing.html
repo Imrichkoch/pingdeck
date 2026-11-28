@@ -1,111 +1,112 @@
 <!doctype html>
-<html lang="sk">
+<html lang="{{lang}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="{{description}}">
   <meta name="theme-color" content="#f5f2ea">
-  <title>{{name}} — Push upozornenia</title>
+  <title>{{name}} {{t:— Push upozornenia}}</title>
   <link rel="icon" href="{{base}}/icon-192.png">
   <link rel="stylesheet" href="{{base}}/site.css">
+  <script type="module" src="{{base}}/language.js"></script>
 </head>
 <body>
   <header class="site-header">
     <div class="shell header-inner">
       <a href="{{base}}/" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
-      <nav class="site-nav" aria-label="Hlavná navigácia">
-        <a href="#moznosti">Možnosti</a><a href="#ukazka">Ukážka</a><a href="#aplikacie">Aplikácie</a><a href="#api">API</a>
+      <nav class="site-nav" aria-label="{{t:Hlavná navigácia}}">
+        <a href="#moznosti">{{t:Možnosti}}</a><a href="#ukazka">{{t:Ukážka}}</a><a href="#aplikacie">{{t:Aplikácie}}</a><a href="#api">API</a>
       </nav>
-      <a class="button button-small button-outline header-cta" href="{{base}}/app">Otvoriť panel ↗</a>
+      <div class="header-tools">{{languageSwitch}}<a class="button button-small button-outline header-cta" href="{{base}}/app">{{t:Otvoriť panel ↗}}</a></div>
     </div>
   </header>
 
   <main class="shell">
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-content">
-        <p class="eyebrow"><span class="indicator"></span> WEB PUSH NA VLASTNOM SERVERI</p>
-        <h1 id="hero-title">Keď na tom záleží, <em>pošli ping.</em></h1>
-        <p class="hero-description">Dostaň upozornenia zo skriptov, monitoringu či domácej automatizácie rovno do mobilu alebo prehliadača.</p>
+        <p class="eyebrow"><span class="indicator"></span> {{t:WEB PUSH NA VLASTNOM SERVERI}}</p>
+        <h1 id="hero-title">{{t:Keď na tom záleží,}} <em>{{t:pošli ping.}}</em></h1>
+        <p class="hero-description">{{t:Dostaň upozornenia zo skriptov, monitoringu či domácej automatizácie rovno do mobilu alebo prehliadača.}}</p>
         <div class="actions">
-          <a class="button button-primary" href="{{base}}/app">Otvoriť panel ↗</a>
+          <a class="button button-primary" href="{{base}}/app">{{t:Otvoriť panel ↗}}</a>
           {{sourceLink}}
         </div>
       </div>
-      <figure class="signal-board" aria-label="Ukážka upozornenia o dokončenej zálohe">
-        <div class="board-header"><span><b class="indicator"></b> UKÁŽKA UPOZORNENIA</span><span>WEB PUSH</span></div>
+      <figure class="signal-board" aria-label="{{t:Ukážka upozornenia o dokončenej zálohe}}">
+        <div class="board-header"><span><b class="indicator"></b> {{t:UKÁŽKA UPOZORNENIA}}</span><span>WEB PUSH</span></div>
         <div class="signal-radar" aria-hidden="true"><span></span><span></span><span></span><span></span><i></i></div>
         <div class="notification">
           <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
-          <div><span class="notification-brand">{{name}}</span><strong>Záloha dokončená</strong><p>Databáza aj súbory sú v poriadku.</p></div>
+          <div><span class="notification-brand">{{name}}</span><strong>{{t:Záloha dokončená}}</strong><p>{{t:Databáza aj súbory sú v poriadku.}}</p></div>
         </div>
-        <div class="board-footer"><span>SKRIPT</span><i></i><span>API</span><i></i><span>ZARIADENIE</span></div>
+        <div class="board-footer"><span>{{t:SKRIPT}}</span><i></i><span>API</span><i></i><span>{{t:ZARIADENIE}}</span></div>
       </figure>
     </section>
 
-    <div class="technology" aria-label="Technológie">
+    <div class="technology" aria-label="{{t:Technológie}}">
       <span><span class="tech-symbol">◎</span> Web Push</span>
       <span><span class="tech-symbol">{ }</span> HTTP API</span>
-      <span><span class="tech-symbol">▱</span> Inštalovateľná PWA</span>
-      <span><span class="tech-symbol">✉</span> E-mailová brána</span>
+      <span><span class="tech-symbol">▱</span> {{t:Inštalovateľná PWA}}</span>
+      <span><span class="tech-symbol">✉</span> {{t:E-mailová brána}}</span>
     </div>
 
     <section id="moznosti" class="features">
       <div class="section-heading">
-        <p class="eyebrow"><span class="indicator"></span> MOŽNOSTI</p>
-        <h2>Od skriptu až<br>na obrazovku.</h2>
+        <p class="eyebrow"><span class="indicator"></span> {{t:MOŽNOSTI}}</p>
+        <h2>{{t:Od skriptu až}}<br>{{t:na obrazovku.}}</h2>
       </div>
       <div class="feature-grid">
-        <article class="feature"><span class="tile-symbol" aria-hidden="true">↗</span><h3>Odošli z čohokoľvek</h3><p>Napoj monitoring, n8n alebo vlastný skript cez jeden HTTP endpoint. Každá integrácia môže mať vlastný API kľúč.</p></article>
-        <article class="feature"><span class="tile-symbol" aria-hidden="true">▣</span><h3>Vyber, kam správa príde</h3><p>Pošli správu všetkým, jednému zariadeniu alebo skupine. Na mobile si môžeš panel pridať na plochu.</p></article>
-        <article class="feature"><span class="tile-symbol" aria-hidden="true">≡</span><h3>Skontroluj výsledok</h3><p>V histórii uvidíš, koľko správ prijala služba Web Push alebo sa zaradilo na doručenie do Androidu.</p></article>
+        <article class="feature"><span class="tile-symbol" aria-hidden="true">↗</span><h3>{{t:Odošli z čohokoľvek}}</h3><p>{{t:Napoj monitoring, n8n alebo vlastný skript cez jeden HTTP endpoint. Každá integrácia môže mať vlastný API kľúč.}}</p></article>
+        <article class="feature"><span class="tile-symbol" aria-hidden="true">▣</span><h3>{{t:Vyber, kam správa príde}}</h3><p>{{t:Pošli správu všetkým, jednému zariadeniu alebo skupine. Na mobile si môžeš panel pridať na plochu.}}</p></article>
+        <article class="feature"><span class="tile-symbol" aria-hidden="true">≡</span><h3>{{t:Skontroluj výsledok}}</h3><p>{{t:V histórii uvidíš, koľko správ prijala služba Web Push alebo sa zaradilo na doručenie do Androidu.}}</p></article>
       </div>
     </section>
 
     <section id="ukazka" class="demo-gallery" aria-labelledby="demo-title">
       <div class="demo-intro">
-        <p class="eyebrow"><span class="indicator"></span> UKÁŽKA Z ANDROIDU</p>
-        <h2 id="demo-title">Doručené do telefónu.</h2>
-        <p>Správy z HTTP API aj e-mailu sa zobrazia medzi upozorneniami a zostanú v histórii PingDecku.</p>
+        <p class="eyebrow"><span class="indicator"></span> {{t:UKÁŽKA Z ANDROIDU}}</p>
+        <h2 id="demo-title">{{t:Doručené do telefónu.}}</h2>
+        <p>{{t:Správy z HTTP API aj e-mailu sa zobrazia medzi upozorneniami a zostanú v histórii PingDecku.}}</p>
       </div>
       <div class="demo-images">
         <figure>
           <a class="demo-frame" href="{{base}}/demo-android-notifications.png">
-            <img src="{{base}}/demo-android-notifications.png" width="1080" height="1920" loading="lazy" decoding="async" alt="Panel upozornení Androidu so správami z PingDecku">
+            <img src="{{base}}/demo-android-notifications.png" width="1080" height="1920" loading="lazy" decoding="async" alt="{{t:Panel upozornení Androidu so správami z PingDecku}}">
           </a>
-          <figcaption>Upozornenia v Androide</figcaption>
+          <figcaption>{{t:Upozornenia v Androide}}</figcaption>
         </figure>
         <figure>
           <a class="demo-frame" href="{{base}}/demo-android-inbox.png">
-            <img src="{{base}}/demo-android-inbox.png" width="1080" height="1920" loading="lazy" decoding="async" alt="Schránka PingDecku s doručenou správou z Mailu a výsledkom monitoringu z API">
+            <img src="{{base}}/demo-android-inbox.png" width="1080" height="1920" loading="lazy" decoding="async" alt="{{t:Schránka PingDecku s doručenou správou z Mailu a výsledkom monitoringu z API}}">
           </a>
-          <figcaption>História v aplikácii</figcaption>
+          <figcaption>{{t:História v aplikácii}}</figcaption>
         </figure>
       </div>
     </section>
 
     <section id="aplikacie" class="mobile-promo">
-      <div><p class="eyebrow"><span class="indicator"></span> MOBILNÉ APLIKÁCIE</p><h2>Upozornenia v telefóne.</h2></div>
-      <div class="actions">{{androidLink}}<a class="button button-outline" href="{{base}}/iphone">iPhone a iPad ↗</a></div>
+      <div><p class="eyebrow"><span class="indicator"></span> {{t:MOBILNÉ APLIKÁCIE}}</p><h2>{{t:Upozornenia v telefóne.}}</h2></div>
+      <div class="actions">{{androidLink}}<a class="button button-outline" href="{{base}}/iphone">{{t:iPhone a iPad ↗}}</a></div>
     </section>
     <section id="api" class="integration">
       <div>
         <p class="eyebrow"><span class="indicator"></span> HTTP API</p>
-        <h2>Jedna HTTP požiadavka.</h2>
-        <p>V paneli pripoj zariadenie a vytvor API kľúč. Vo svojom skripte nastav premennú <code>PINGDECK_KEY</code>.</p>
-        <a class="button button-inverse" href="{{base}}/app#integracie">Prejsť k integráciám ↗</a>
+        <h2>{{t:Jedna HTTP požiadavka.}}</h2>
+        <p>{{t:V paneli pripoj zariadenie a vytvor API kľúč. Vo svojom skripte nastav premennú}} <code>PINGDECK_KEY</code>.</p>
+        <a class="button button-inverse" href="{{base}}/app#integracie">{{t:Prejsť k integráciám ↗}}</a>
       </div>
-      <div class="code-window"><div class="code-header"><span>TERMINÁL</span><span>BASH</span></div>
+      <div class="code-window"><div class="code-header"><span>{{t:TERMINÁL}}</span><span>BASH</span></div>
         <pre><code><b>curl</b> '{{endpoint}}' \
   -H "Authorization: Bearer $PINGDECK_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"title":"Záloha","message":"Hotovo!"}'</code></pre>
+  -d '{"title":"{{t:Záloha}}","message":"{{t:Hotovo!}}"}'</code></pre>
       </div>
     </section>
   </main>
 
   <footer class="site-footer shell">
     <a href="{{base}}/" class="wordmark"><span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>{{name}}</a>
-    <a href="{{base}}/app">Správa upozornení ↗</a>
+    <a href="{{base}}/app">{{t:Správa upozornení ↗}}</a>
   </footer>
 </body>
 </html>

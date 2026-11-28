@@ -18,20 +18,48 @@ import java.security.KeyStore;
 final class State {
     private static final String KEY = "pingdeck.receiver";
     private static final int INBOX_LIMIT = 100;
+    private final Context context;
     final SharedPreferences prefs;
 
     State(Context context) {
+        this.context = context;
         prefs = context.getSharedPreferences("pingdeck", Context.MODE_PRIVATE);
     }
 
     String base() { return prefs.getString("base", Api.DEFAULT_URL); }
     String name() { return prefs.getString("name", ""); }
-    String status() { return prefs.getString("status", "Príjem je pozastavený."); }
+    enum Status {
+        PAUSED, PAIRED, DISCONNECTED, DISCONNECT_FAILED, CONNECTING, PERMISSION,
+        KEY_MISSING, NOTIFICATIONS_DISABLED, READY, REVOKED, RECONNECTING
+    }
+
+    Status statusReason() {
+        try { return Status.valueOf(prefs.getString("status", "PAUSED")); }
+        catch (IllegalArgumentException legacyStatus) { return Status.PAUSED; }
+    }
+
+    String status() {
+        int resource;
+        switch (statusReason()) {
+            case PAIRED: resource = R.string.state_paired; break;
+            case DISCONNECTED: resource = R.string.state_disconnected; break;
+            case DISCONNECT_FAILED: resource = R.string.state_disconnect_failed; break;
+            case CONNECTING: resource = R.string.state_connecting; break;
+            case PERMISSION: resource = R.string.state_permission; break;
+            case KEY_MISSING: resource = R.string.state_key_missing; break;
+            case NOTIFICATIONS_DISABLED: resource = R.string.state_notifications_disabled; break;
+            case READY: resource = R.string.state_ready; break;
+            case REVOKED: resource = R.string.state_revoked; break;
+            case RECONNECTING: resource = R.string.state_reconnecting; break;
+            default: resource = R.string.state_paused;
+        }
+        return context.getString(resource);
+    }
     boolean paired() { return prefs.contains("token"); }
     boolean active() { return prefs.getBoolean("active", false); }
 
-    void setStatus(String status) {
-        if (!status.equals(status())) prefs.edit().putString("status", status).apply();
+    void setStatus(Status status) {
+        if (!status.name().equals(prefs.getString("status", ""))) prefs.edit().putString("status", status.name()).apply();
     }
     void setActive(boolean value) {
         if (active() != value) prefs.edit().putBoolean("active", value).apply();
@@ -52,8 +80,8 @@ final class State {
         String value = Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP) + "." +
                 Base64.encodeToString(cipher.doFinal(token.getBytes(StandardCharsets.UTF_8)), Base64.NO_WRAP);
         if (!prefs.edit().putString("base", base).putString("name", name).putString("token", value)
-                .putString("status", "Spárované. Povoľ prijímanie upozornení.").remove("inbox").commit()) {
-            throw new IllegalStateException("Informácie o párovaní sa nepodarilo uložiť.");
+                .putString("status", Status.PAIRED.name()).remove("inbox").commit()) {
+            throw new IllegalStateException(context.getString(R.string.save_pair_error));
         }
     }
 
@@ -71,7 +99,7 @@ final class State {
 
     void unpair() {
         prefs.edit().remove("token").remove("name").remove("inbox").remove("active")
-                .putString("status", "Telefón bol odpojený.").apply();
+                .putString("status", Status.DISCONNECTED.name()).apply();
     }
 
     JSONArray inbox() {
@@ -94,7 +122,7 @@ final class State {
             messages.put(previous.getJSONObject(index));
         }
         if (!prefs.edit().putString("inbox", messages.toString()).commit()) {
-            throw new IllegalStateException("Správu sa nepodarilo uložiť.");
+            throw new IllegalStateException(context.getString(R.string.save_message_error));
         }
     }
 }

@@ -51,7 +51,7 @@ export function startMailGateway(send) {
             if (!auto || String(auto).toLowerCase() === 'no') {
               let subject = parsed.subject?.trim() ?? ''
               let group = ''
-              const tag = subject.match(/^\[skupina:([^\]\r\n]{1,48})\]\s*/i)
+              const tag = subject.match(/^\[(?:skupina|group):([^\]\r\n]{1,48})\]\s*/i)
               if (tag) {
                 group = tag[1].trim()
                 subject = subject.slice(tag[0].length)

@@ -93,34 +93,40 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         add(content, brand, 0);
         if (showingInbox) inboxView();
         else pairingView();
+        if (Build.VERSION.SDK_INT >= 33) {
+            Button language = button(getString(R.string.change_language), false);
+            add(content, language, 14);
+            language.setOnClickListener(view -> startActivity(new Intent(Settings.ACTION_APP_LOCALE_SETTINGS,
+                    Uri.parse("package:" + getPackageName()))));
+        }
     }
 
     private void pairingView() {
-        add(content, text("Pripoj telefón", 38, INK, true), 26);
-        String description = state.status().startsWith("Odber bol") ? state.status() :
-                "V paneli otvor Zariadenia, vytvor Android kód a vlož ho sem.";
+        add(content, text(getString(R.string.connect_phone), 38, INK, true), 26);
+        String description = state.statusReason() == State.Status.REVOKED ? state.status() :
+                getString(R.string.pair_instructions);
         add(content, text(description, 16, MUTED, false), 8);
         LinearLayout card = card();
         add(content, card, 21);
-        add(card, text("HTTPS adresa servera", 14, INK, true), 0);
+        add(card, text(getString(R.string.server_address), 14, INK, true), 0);
         EditText server = input("https://", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setText(state.base());
         add(card, server, 6);
-        add(card, text("Jednorazový párovací kód", 14, INK, true), 12);
-        EditText code = input("Kód z panela", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        add(card, text(getString(R.string.pair_code), 14, INK, true), 12);
+        EditText code = input(getString(R.string.code_hint), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         add(card, code, 6);
 
         TextView feedback = text("", 14, ERROR, false);
-        Button pair = button("Spárovať telefón", true);
+        Button pair = button(getString(R.string.pair_phone), true);
         add(card, pair, 16);
         add(card, feedback, 9);
         pair.setOnClickListener(view -> {
             final Api api;
-            try { api = new Api(server.getText().toString()); }
+            try { api = new Api(this, server.getText().toString()); }
             catch (IllegalArgumentException error) { feedback.setText(error.getMessage()); return; }
             String value = code.getText().toString().trim();
             if (!value.matches("[A-Za-z0-9_-]{22}")) {
-                feedback.setText("Vlož celý párovací kód.");
+                feedback.setText(getString(R.string.invalid_code));
                 return;
             }
             feedback.setText("");
@@ -137,21 +143,21 @@ public final class MainActivity extends Activity implements SharedPreferences.On
                 } catch (Exception error) {
                     runOnUiThread(() -> {
                         pair.setEnabled(true);
-                        feedback.setText(error instanceof Api.Failure ? error.getMessage() : "Párovanie sa nepodarilo. Skontroluj adresu a pripojenie.");
+                        feedback.setText(error instanceof Api.Failure ? error.getMessage() : getString(R.string.pair_error));
                     });
                 }
             });
         });
-        Button panel = button("Otvoriť webový panel ↗", false);
+        Button panel = button(getString(R.string.open_dashboard), false);
         add(content, panel, 15);
         panel.setOnClickListener(view -> {
-            try { open(safeLink(new Api(server.getText().toString()).base + "/app#zariadenia")); }
+            try { open(safeLink(new Api(this, server.getText().toString()).base + "/app#zariadenia")); }
             catch (IllegalArgumentException error) { feedback.setText(error.getMessage()); }
         });
     }
 
     private void inboxView() {
-        add(content, text("Doručené správy", 36, INK, true), 26);
+        add(content, text(getString(R.string.received_messages), 36, INK, true), 26);
         LinearLayout connection = card();
         add(content, connection, 15);
         add(connection, text(state.name(), 18, INK, true), 0);
@@ -162,25 +168,25 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         toggle.setOnClickListener(view -> {
             if (state.active()) {
                 state.setActive(false);
-                state.setStatus("Príjem je pozastavený.");
+                state.setStatus(State.Status.PAUSED);
                 stopService(new Intent(this, ReceiverService.class));
             } else {
                 enableReceiving();
             }
         });
-        add(content, text("História v tomto telefóne", 19, INK, true), 22);
+        add(content, text(getString(R.string.local_history), 19, INK, true), 22);
         messages = column();
         add(content, messages, 0);
-        Button panel = button("Otvoriť webový panel ↗", false);
+        Button panel = button(getString(R.string.open_dashboard), false);
         add(content, panel, 19);
         panel.setOnClickListener(view -> open(safeLink(state.base() + "/app")));
-        Button unlink = button("Odpojiť telefón", false);
+        Button unlink = button(getString(R.string.disconnect_phone), false);
         add(content, unlink, 8);
         unlink.setOnClickListener(view -> new AlertDialog.Builder(this)
-                .setTitle("Odpojiť telefón?")
-                .setMessage("Príjem sa zastaví a história v telefóne sa vymaže.")
-                .setNegativeButton("Zrušiť", null)
-                .setPositiveButton("Odpojiť", (dialog, which) -> disconnect(unlink)).show());
+                .setTitle(getString(R.string.disconnect_question))
+                .setMessage(getString(R.string.disconnect_description))
+                .setNegativeButton(getString(R.string.cancel), null)
+                .setPositiveButton(getString(R.string.disconnect), (dialog, which) -> disconnect(unlink)).show());
         updateStatus();
         updateHistory();
     }
@@ -195,12 +201,12 @@ public final class MainActivity extends Activity implements SharedPreferences.On
                 try { token = state.token(); }
                 catch (Exception lostKey) { token = null; }
                 if (token != null) {
-                    try { new Api(state.base()).call("DELETE", "device", token, null); }
+                    try { new Api(this, state.base()).call("DELETE", "device", token, null); }
                     catch (Api.Failure response) { if (response.status != 401) throw response; }
                 }
                 state.unpair();
             } catch (Exception error) {
-                state.setStatus("Server je nedostupný. Skús odpojenie znova.");
+                state.setStatus(State.Status.DISCONNECT_FAILED);
                 runOnUiThread(() -> button.setEnabled(true));
             }
         });
@@ -220,7 +226,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
 
     private void startListening() {
         state.setActive(true);
-        state.setStatus("Pripájam sa k serveru…");
+        state.setStatus(State.Status.CONNECTING);
         startForegroundService(new Intent(this, ReceiverService.class));
     }
 
@@ -229,7 +235,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         if (code != PERMISSION || !state.paired()) return;
         if (grants.length > 0 && grants[0] == PackageManager.PERMISSION_GRANTED) startListening();
         else {
-            state.setStatus("Povoľ upozornenia, aby telefón mohol prijímať správy.");
+            state.setStatus(State.Status.PERMISSION);
             if (!shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) openNotificationSettings();
         }
     }
@@ -242,7 +248,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
     private void updateStatus() {
         if (!showingInbox || status == null) return;
         status.setText(state.status());
-        toggle.setText(state.active() ? "Pozastaviť príjem" : "Zapnúť príjem");
+        toggle.setText(state.active() ? getString(R.string.pause_receiving) : getString(R.string.enable_receiving));
     }
 
     private void updateHistory() {
@@ -250,10 +256,11 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         messages.removeAllViews();
         JSONArray rows = state.inbox();
         if (rows.length() == 0) {
-            add(messages, text("Doručené upozornenia sa zobrazia tu.", 15, MUTED, false), 8);
+            add(messages, text(getString(R.string.empty_history), 15, MUTED, false), 8);
             return;
         }
-        DateFormat dates = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT);
+        DateFormat dates = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT,
+                getResources().getConfiguration().getLocales().get(0));
         for (int index = 0; index < rows.length(); index++) {
             JSONObject entry = rows.optJSONObject(index);
             if (entry == null) continue;
@@ -264,7 +271,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
             add(item, text(dates.format(new Date(entry.optLong("created"))), 12, MUTED, false), 9);
             Uri link = safeLink(entry.optString("url"));
             if (link != null) {
-                Button follow = button("Otvoriť odkaz ↗", false);
+                Button follow = button(getString(R.string.open_link), false);
                 add(item, follow, 10);
                 follow.setOnClickListener(view -> open(link));
             }
@@ -287,7 +294,7 @@ public final class MainActivity extends Activity implements SharedPreferences.On
         if (uri != null) {
             try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
             catch (android.content.ActivityNotFoundException error) {
-                new AlertDialog.Builder(this).setMessage("Prehliadač nie je dostupný.").setPositiveButton("OK", null).show();
+                new AlertDialog.Builder(this).setMessage(getString(R.string.browser_missing)).setPositiveButton("OK", null).show();
             }
         }
     }
